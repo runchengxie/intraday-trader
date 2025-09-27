@@ -22,14 +22,13 @@ paths:
   cache_dir: "output/cache"
 
 # --- Database Configuration ---
-# The following values use the syntax ${VARIABLE:-default}, which provides
-# a fallback value if the corresponding environment variable is not set.
+# By default we keep things simple and store data in a local SQLite file.
+# Switch `backend` to `postgresql` and supply host/user/password fields when
+# you are ready to promote to TimescaleDB, or set it to `parquet` to use
+# filesystem-based caching only.
 database:
-  host: ${DB_HOST:-localhost}
-  port: ${DB_PORT:-5432}
-  user: ${DB_USER:-trading_user}
-  password: ${DB_PASSWORD:-strong_password}
-  dbname: ${DB_NAME:-trading_db}
+  backend: ${DB_BACKEND:-sqlite}
+  path: ${DB_PATH:-output/trading.db}
 
 # --- Backtest Configuration ---
 backtest:

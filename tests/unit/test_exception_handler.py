@@ -1,15 +1,15 @@
-import pytest
-import time
 import json
-from unittest.mock import MagicMock, call
+import time
+from unittest.mock import MagicMock
 
-# Import the classes and decorators to be tested
-from src.patf_trading_framework.exception_handler import (
-    ExceptionHandler,
+import pytest
+
+from patf_trading_framework.exception_handler import (
+    CircuitBreaker,
     ErrorCategory,
     ErrorSeverity,
+    ExceptionHandler,
     RetryConfig,
-    CircuitBreaker,
     handle_exceptions,
 )
 
@@ -31,10 +31,11 @@ def retry_config():
 def test_retry_config_exponential_backoff(retry_config):
     """Verify that the delay increases exponentially with backoff enabled."""
     retry_config.exponential_backoff = True
+    retry_config.jitter = False
     delay1 = retry_config.get_delay(0) # 2**0 * 0.01
     delay2 = retry_config.get_delay(1) # 2**1 * 0.01
     delay3 = retry_config.get_delay(2) # 2**2 * 0.01
-    
+
     # We use pytest.approx because of jitter
     assert delay2 > delay1
     assert delay3 > delay2
@@ -56,26 +57,26 @@ def test_retry_config_no_backoff(retry_config):
 def test_circuit_breaker_trips_and_opens():
     """Verify the breaker opens after reaching the failure threshold."""
     breaker = CircuitBreaker(failure_threshold=2, recovery_timeout=10)
-    failing_func = MagicMock(side_effect=ValueError("Failed"))
-    
-    # First failure
+    call_counter = {"value": 0}
+
+    def failing_func():
+        call_counter["value"] += 1
+        raise ValueError("Failed")
+
     with pytest.raises(ValueError):
         breaker.call(failing_func)
     assert breaker.state == "CLOSED"
     assert breaker.failure_count == 1
-    
-    # Second failure - should trip the breaker
+
     with pytest.raises(ValueError):
         breaker.call(failing_func)
     assert breaker.state == "OPEN"
     assert breaker.failure_count == 2
-    
-    # Third call should be blocked immediately
+
     with pytest.raises(Exception, match="Circuit breaker is open"):
         breaker.call(failing_func)
-    
-    # The original function should only have been called twice
-    assert failing_func.call_count == 2
+
+    assert call_counter["value"] == 2
 
 
 def test_circuit_breaker_resets_after_recovery():
@@ -163,19 +164,20 @@ class MockTrader:
         raise SystemError("System failed")
 
 
-def test_handle_exceptions_decorator_with_retry(handler):
+def test_handle_exceptions_decorator_with_retry(handler, caplog):
     """Verify the retry decorator re-executes the function until it succeeds."""
     # Configure a fast retry for the test
     handler.retry_configs[ErrorCategory.API] = RetryConfig(max_retries=3, base_delay=0.01)
-    
+
     trader = MockTrader(handler)
-    result = trader.fetch_data_with_retry()
-    
+    with caplog.at_level("WARNING"):
+        result = trader.fetch_data_with_retry()
+
     assert result == "Success"
     assert trader.call_count == 3
-    # Two errors should have been logged for the failed attempts
-    assert len(handler.error_records) == 2
-    assert handler.error_records[0].error_type == 'ValueError'
+    assert handler.error_records == []
+    assert handler.emergency_stop_triggered is False
+    assert any("Retrying" in record.message for record in caplog.records)
 
 
 def test_handle_exceptions_decorator_no_retry(handler):

@@ -1,15 +1,14 @@
 import pytest
-import pandas as pd
-import backtrader as bt
 
-# Import all strategy classes to be tested
-from src.patf_trading_framework.strategies import (
+pd = pytest.importorskip("pandas")
+bt = pytest.importorskip("backtrader")
+
+from patf_trading_framework.strategies import (
     EMACrossoverStrategy,
     MeanReversionZScoreStrategy,
     CustomRatioStrategy,
 )
 
-# --- Pytest Fixture for Standard Cerebro Setup ---
 
 @pytest.fixture
 def cerebro_setup():

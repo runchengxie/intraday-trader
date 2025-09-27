@@ -4,14 +4,8 @@ from datetime import date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta  # ensures df.ta is registered
-from pykalman import KalmanFilter
 
 from .db_handler import DBHandler
-
-# For pandas_ta compatibility with NumPy ≥1.25
-if not hasattr(np, "NaN"):
-    np.NaN = np.nan
 
 
 # --- Logging Setup ---
@@ -201,23 +195,77 @@ def fetch_historical_data(
         return None
 
 
-# --- Kalman Filter Function ---
-def apply_kalman_filter(prices):
-    kf = KalmanFilter(
-        transition_matrices=[1],
-        observation_matrices=[1],
-        initial_state_mean=prices.iloc[0],
-        n_dim_obs=1,
+# --- Price smoothing helper (formerly Kalman filter) ---
+def apply_kalman_filter(prices: pd.Series, span: int = 10) -> pd.Series:
+    """Lightweight price smoother used in place of the previous Kalman filter.
+
+    The original implementation relied on the ``pykalman`` dependency, which we
+    dropped to simplify the prototype stack.  For an initial MVP a low-latency
+    exponential moving average provides comparable noise reduction while keeping
+    the dependency footprint minimal.  The function signature remains the same so
+    callers do not need to change.
+    """
+
+    if prices is None or prices.empty:
+        return prices
+
+    smoothed = prices.ewm(span=span, adjust=False).mean()
+    smoothed.name = getattr(prices, "name", "smoothed")
+    return smoothed
+
+
+def _compute_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
+    """Compute ADX and directional indicators without external libraries."""
+
+    high = df["high"].astype(float)
+    low = df["low"].astype(float)
+    close = df["close"].astype(float)
+
+    up_move = high.diff()
+    down_move = low.shift(1) - low
+
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+
+    tr_components = pd.concat(
+        [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
+        axis=1,
     )
-    state_means, _ = kf.filter(prices.values)
-    return pd.Series(state_means.flatten(), index=prices.index)
+    true_range = tr_components.max(axis=1)
+
+    atr = true_range.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+    plus_di = (
+        pd.Series(plus_dm, index=df.index)
+        .ewm(alpha=1 / period, min_periods=period, adjust=False)
+        .mean()
+        / atr
+    ) * 100
+    minus_di = (
+        pd.Series(minus_dm, index=df.index)
+        .ewm(alpha=1 / period, min_periods=period, adjust=False)
+        .mean()
+        / atr
+    ) * 100
+
+    directional_sum = (plus_di + minus_di).replace(0, np.nan)
+    dx = (plus_di - minus_di).abs() / directional_sum * 100
+    adx = dx.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+
+    return pd.DataFrame(
+        {
+            f"adx_{period}": adx,
+            f"dmp_{period}": plus_di,
+            f"dmn_{period}": minus_di,
+        }
+    )
 
 
 def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Adds a set of technical indicators to the DataFrame using pandas-ta.
-    It calculates SMA, EMA, and ADX, then renames the generated columns
-    to a consistent lowercase format for easier access.
+    Adds a minimal set of technical indicators using pandas-native
+    calculations so we can avoid heavy third-party dependencies during
+    prototyping.  The function keeps the previous column names to remain
+    compatible with existing strategy code.
 
     Args:
         df (pd.DataFrame): DataFrame with 'open', 'high', 'low', 'close' columns.
@@ -229,27 +277,14 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
         logger.error("DataFrame is missing required columns ('high','low','close') for TA.")
         return df
 
-    logger.info("Adding technical indicators (SMA, EMA, ADX) using pandas-ta...")
-    # compute
-    df.ta.sma(length=20, append=True)
-    df.ta.sma(length=50, append=True)
-    df.ta.ema(length=12, append=True)
-    adx_df = ta.adx(high=df["high"], low=df["low"], close=df["close"], length=14)
+    logger.info("Adding technical indicators (SMA, EMA, ADX) using pandas only...")
+    df["sma_20"] = df["close"].rolling(window=20, min_periods=20).mean()
+    df["sma_50"] = df["close"].rolling(window=50, min_periods=50).mean()
+    df["ema_12"] = df["close"].ewm(span=12, adjust=False).mean()
+
+    adx_df = _compute_adx(df, period=14)
     df = df.join(adx_df)
 
-    # rename to your expected lowercase schema
-    rename_map = {
-        "SMA_20": "sma_20",
-        "SMA_50": "sma_50",
-        "EMA_12": "ema_12",
-        "ADX_14": "adx_14",
-        "DMP_14": "dmp_14",
-        "DMN_14": "dmn_14",
-    }
-    cols_to_rename = {k: v for k, v in rename_map.items() if k in df.columns}
-    df.rename(columns=cols_to_rename, inplace=True)
-
-    # sanity check so the next display() doesn't blow up
     required = ["ema_12", "adx_14"]
     missing = [c for c in required if c not in df.columns]
     if missing:

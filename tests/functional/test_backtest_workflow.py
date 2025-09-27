@@ -1,5 +1,7 @@
-import backtrader as bt
-import pandas as pd
+import pytest
+
+bt = pytest.importorskip("backtrader")
+pd = pytest.importorskip("pandas")
 
 from patf_trading_framework.scripts.run_backtests import run_backtest
 from patf_trading_framework.strategies import CustomRatioStrategy

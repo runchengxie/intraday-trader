@@ -1,24 +1,24 @@
-import pytest
-import pandas as pd
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-import sys
-import logging
 
-# Add the project root to the system path to allow module imports from 'src'
-project_root = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(project_root))
+import pytest
+
+pd = pytest.importorskip("pandas")
 
 from dotenv import load_dotenv
 from sqlalchemy import inspect, text
 
-# Import the modules to be tested
-from src.patf_trading_framework.db_handler import (
+from patf_trading_framework.db_handler import (
     DBHandler,
-    TradeLog,
     PerformanceSnapshot,
+    TradeLog,
 )
-from src.patf_trading_framework.scripts.run_backtests import load_config
+from patf_trading_framework.scripts.run_backtests import load_config
+
+project_root = Path(__file__).resolve().parent.parent.parent
+
+pytestmark = pytest.mark.integration
 
 # --- Test Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -40,7 +40,14 @@ def db_handler():
         # Load config to get database connection details
         load_dotenv(dotenv_path=project_root / ".env")
         config = load_config(project_root / "config.yml")
-        db_config = config["database"]
+        db_config = config["database"].copy()
+
+        if db_config.get("backend", "sqlite").lower() == "sqlite":
+            tmp_db_path = project_root / "output" / "test_trading.db"
+            tmp_db_path.parent.mkdir(parents=True, exist_ok=True)
+            if tmp_db_path.exists():
+                tmp_db_path.unlink()
+            db_config["path"] = str(tmp_db_path)
 
         handler = DBHandler(db_config)
         logger.info("Initializing test database schema...")
@@ -51,16 +58,22 @@ def db_handler():
 
     finally:
         # --- Teardown ---
-        if handler and handler.engine:
+        if not handler:
+            return
+
+        if handler.engine:
             logger.info("Tearing down test database: dropping all tables...")
             with handler.engine.connect() as connection:
-                # Use raw SQL to drop tables, ensuring a complete reset
-                # The CASCADE option handles any dependencies between tables.
-                connection.execute(text("DROP TABLE IF EXISTS market_data CASCADE;"))
-                connection.execute(text("DROP TABLE IF EXISTS trade_logs CASCADE;"))
-                connection.execute(text("DROP TABLE IF EXISTS performance_snapshots CASCADE;"))
+                connection.execute(text("DROP TABLE IF EXISTS market_data;"))
+                connection.execute(text("DROP TABLE IF EXISTS trade_logs;"))
+                connection.execute(text("DROP TABLE IF EXISTS performance_snapshots;"))
                 connection.commit()
             logger.info("Test database tables dropped successfully.")
+            if handler.backend == "sqlite" and handler.sqlite_path and handler.sqlite_path.exists():
+                handler.sqlite_path.unlink(missing_ok=True)
+        elif handler.backend == "parquet" and handler.storage_dir:
+            for artifact in handler.storage_dir.glob("*.parquet"):
+                artifact.unlink(missing_ok=True)
 
 @pytest.fixture(scope="module")
 def sample_market_data():
@@ -87,20 +100,22 @@ def test_db_connection_and_initialization(db_handler):
     """
     logger.info("--- [Test Case: Database Connection and Initialization] ---")
     assert db_handler is not None, "DBHandler instance should be created."
-    assert db_handler.engine is not None, "Database engine should be initialized."
+    if db_handler.engine:
+        inspector = inspect(db_handler.engine)
+        assert inspector.has_table("market_data"), "Table 'market_data' should exist."
+        assert inspector.has_table("trade_logs"), "Table 'trade_logs' should exist."
+        assert inspector.has_table("performance_snapshots"), "Table 'performance_snapshots' should exist."
 
-    # Use SQLAlchemy's inspector to check if tables exist
-    inspector = inspect(db_handler.engine)
-    assert inspector.has_table("market_data"), "Table 'market_data' should exist."
-    assert inspector.has_table("trade_logs"), "Table 'trade_logs' should exist."
-    assert inspector.has_table("performance_snapshots"), "Table 'performance_snapshots' should exist."
-    
-    # Verify that the tables are TimescaleDB hypertables
-    with db_handler.engine.connect() as conn:
-        is_hypertable = conn.execute(text(
-            "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'market_data';"
-        )).scalar_one_or_none()
-        assert is_hypertable == 1, "'market_data' should be a hypertable."
+        if db_handler.backend in {"postgres", "postgresql"}:
+            with db_handler.engine.connect() as conn:
+                is_hypertable = conn.execute(text(
+                    "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'market_data';"
+                )).scalar_one_or_none()
+                assert is_hypertable == 1, "'market_data' should be a hypertable."
+    else:
+        # Parquet backend: ensure storage directory exists
+        assert db_handler.backend == "parquet"
+        assert db_handler.storage_dir is not None and db_handler.storage_dir.exists()
 
     logger.info("Database connection, table, and hypertable initialization verified.")
 

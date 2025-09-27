@@ -1,24 +1,37 @@
 import pytest
+
+pytest.importorskip("alpaca_trade_api")
 from alpaca_trade_api.rest import APIError
+
 from patf_trading_framework.broker_handler import BrokerAPIHandler
 
-def test_place_order_api_error_handling(mocker):
-    """
-    Verify that place_order returns None and logs an error when the API call fails.
-    """
-    # Arrange: Mock the 'submit_order' method of the Alpaca REST API client
-    # to raise an APIError, simulating a failure.
-    mocker.patch(
-        'alpaca_trade_api.rest.REST.submit_order',
-        side_effect=APIError({'code': 403, 'message': 'forbidden'})
+
+@pytest.fixture
+def mock_broker_dependencies(monkeypatch, mocker):
+    """Provide environment variables and stubbed Alpaca REST client for tests."""
+    monkeypatch.setenv("APCA_API_KEY_ID", "test-key")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "test-secret")
+    monkeypatch.setenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+    mock_rest = mocker.MagicMock()
+    mock_rest.get_account.return_value = mocker.MagicMock(
+        id="acct-123", status="ACTIVE", buying_power="100000"
     )
+    mocker.patch("patf_trading_framework.broker_handler.REST", return_value=mock_rest)
 
-    # We need to initialize the handler *after* patching if the init itself makes API calls.
-    # For this example, we assume init succeeds but submit_order fails.
-    handler = BrokerAPIHandler() # This might need mocking too in a real scenario
+    return mock_rest
 
-    # Act: Call the method that we expect to fail
+
+def test_place_order_api_error_handling(mock_broker_dependencies):
+    """Verify that place_order returns None and logs an API error gracefully."""
+    mock_rest = mock_broker_dependencies
+    mock_rest.submit_order.side_effect = APIError({"code": 403, "message": "forbidden"})
+
+    handler = BrokerAPIHandler()
+
     result = handler.place_order(symbol="FAIL", qty=1, side="buy", order_type="market")
 
-    # Assert: The method should gracefully handle the exception and return None
     assert result is None
+    mock_rest.submit_order.assert_called_once_with(
+        symbol="FAIL", qty=1.0, side="buy", type="market", time_in_force="day"
+    )
