@@ -69,6 +69,7 @@ dashboard = [
 
 # Define script entry points, allowing them to be run from the command line after installation.
 [project.scripts]
+patf = "patf_trading_framework.cli:main"
 run-backtest = "patf_trading_framework.scripts.run_backtests:main"
 run-live = "patf_trading_framework.scripts.run_live_trading:main"
 run-update-data = "patf_trading_framework.scripts.run_update_data:main"

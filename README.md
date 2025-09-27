@@ -119,10 +119,12 @@ flowchart LR
    # source venv/bin/activate
    ```
 
-2. **安装依赖**
+2. **安装依赖并注册 CLI 命令**
    ```bash
    uv sync
+   uv pip install -e .
    ```
+   执行以上命令后会自动在虚拟环境中注册 `patf` 命令行入口，方便通过统一的 CLI 调用各个脚本。
 
 3. **配置凭证**
    将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
