@@ -195,26 +195,37 @@ class DBHandler:
         temp_table_name = "temp_market_data_upload"
         df_to_save.to_sql(temp_table_name, self.engine, if_exists="replace", index=False)
 
-        upsert_sql = text(
-            f"""
-            INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume)
-            SELECT timestamp, symbol, open, high, low, close, volume FROM {temp_table_name}
-            ON CONFLICT (timestamp, symbol) DO NOTHING;
-        """
-        )
-
-        with self.engine.connect() as conn:
-            result = conn.execute(upsert_sql)
-            conn.commit()
-            logger.info(
-                "Upsert operation complete for %s. %d new rows inserted.",
-                symbol,
-                result.rowcount,
+        if self.backend == "sqlite":
+            upsert_statement = text(
+                f"""
+                INSERT OR IGNORE INTO market_data (timestamp, symbol, open, high, low, close, volume)
+                SELECT timestamp, symbol, open, high, low, close, volume FROM {temp_table_name};
+            """
+            )
+        else:
+            upsert_statement = text(
+                f"""
+                INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume)
+                SELECT timestamp, symbol, open, high, low, close, volume FROM {temp_table_name}
+                ON CONFLICT (timestamp, symbol) DO NOTHING;
+            """
             )
 
-        with self.engine.connect() as conn:
-            conn.execute(text(f"DROP TABLE {temp_table_name};"))
-            conn.commit()
+        rows_inserted = 0
+        try:
+            with self.engine.begin() as conn:
+                result = conn.execute(upsert_statement)
+                if result.rowcount and result.rowcount > 0:
+                    rows_inserted = result.rowcount
+        finally:
+            with self.engine.begin() as conn:
+                conn.execute(text(f"DROP TABLE IF EXISTS {temp_table_name};"))
+
+        logger.info(
+            "Upsert operation complete for %s. %d new rows inserted.",
+            symbol,
+            rows_inserted,
+        )
 
     def _save_market_data_parquet(self, df: pd.DataFrame):
         path = self._parquet_table_path("market_data")
