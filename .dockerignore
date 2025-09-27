@@ -1,0 +1,33 @@
+# .dockerignore
+
+# Git and Docker specific
+.git
+.gitignore
+.dockerignore
+Dockerfile
+full_code_text.txt
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+/venv/
+/env/
+
+# IDE / Editor files
+.vscode/
+.idea/
+
+# Sensitive files
+.env
+
+# Generated Output & Logs
+/output/
+/docs/
+/notebooks/
+/tests/
+
+# Build artifacts
+/build/
+/dist/
+*.whl

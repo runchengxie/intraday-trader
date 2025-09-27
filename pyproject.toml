@@ -1,0 +1,116 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "patf-trading-framework"
+version = "0.1.0"
+authors = [
+  { name="Richard", email="xieruncheng@gmail.com" }
+]
+description = "A comprehensive Python framework for algorithmic trading strategy development, back-testing, and live trading."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file="LICENSE.txt" }
+keywords = ["trading", "algorithmic-trading", "back-testing", "finance", "alpaca"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# Core dependencies: these are required to run the project.
+dependencies = [
+    "pandas>=1.5",
+    "numpy==1.26.4",
+    "pyyaml",
+    "matplotlib>=3.5",
+    "seaborn>=0.12",
+    "requests>=2.28",
+    "python-dotenv>=0.21",
+    "pyarrow>=11.0",
+    "websockets>=10.0",
+    "pandas-ta==0.3.14b0",
+    "pykalman",
+    "scipy>=1.8",
+    "alpaca-trade-api",
+    "backtrader",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary",
+    "streamlit",
+]
+
+# Optional dependencies: 'dev' includes all tools for development, testing, and code quality.
+# Use 'pip install -e .[dev]' to install.
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio", # For testing asyncio code
+    "pytest-cov",
+]
+
+dev = [
+    "patf-trading-framework[test]", # Includes all test dependencies
+    "ruff",              # The all-in-one linter and formatter
+    "pre-commit",        # For automatically running checks before commits
+    "jupyterlab",        # For running and developing notebooks
+    "ipykernel",         # To make the project's venv available in Jupyter
+]
+
+# Define script entry points, allowing them to be run from the command line after installation.
+[project.scripts]
+run-backtest = "patf_trading_framework.scripts.run_backtests:main"
+run-live = "patf_trading_framework.scripts.run_live_trading:main"
+run-update-data = "patf_trading_framework.scripts.run_update_data:main"
+run-generate-report = "patf_trading_framework.scripts.run_generate_report:main"
+run-dashboard = "patf_trading_framework.scripts.run_dashboard:main"
+
+[project.urls]
+Homepage = "N/A"
+"Bug Tracker" = "N/A"
+
+# --- Tool-specific configurations ---
+
+# Use the standard src-layout configuration.
+# This tells setuptools that the root for all packages is the 'src' directory.
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+
+# --- Ruff Configuration ---
+[tool.ruff]
+# Set the target Python version
+target-version = "py310"
+# Set the line length
+line-length = 88
+
+# --- Ruff Formatter Configuration ---
+[tool.ruff.format]
+# Enable docstring code formatting.
+docstring-code-format = true
+
+# --- Ruff Linter Configuration ---
+[tool.ruff.lint]
+# Select the rule codes to enable.
+# E, W: pycodestyle (standard errors and warnings)
+# F: Pyflakes (common logical errors)
+# I: isort (import sorting)
+# UP: pyupgrade (modernize code syntax)
+# PL: Pylint (many transplanted Pylint rules)
+select = ["E", "W", "F", "I", "UP", "PL"]
+
+# Ignore specific rules that were previously disabled in Pylint.
+ignore = [
+    "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", # pydocstyle missing docstrings
+]
+
+# Specific configuration for the import sorter (isort).
+[tool.ruff.lint.isort]
+# Specify known third-party libraries to help Ruff sort them correctly.
+known-third-party = ["alpaca_trade_api", "backtrader", "matplotlib", "numpy", "pandas", "pytest", "pyyaml", "requests", "streamlit", "sqlalchemy", "seaborn", "scipy"]

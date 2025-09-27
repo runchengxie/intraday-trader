@@ -1,0 +1,52 @@
+services:
+  db:
+    image: timescale/timescaledb-ha:pg16-all
+    container_name: trading_db
+    restart: always
+    environment:
+      - POSTGRES_USER=trading_user
+      # Docker Compose automatically populates the POSTGRES_PASSWORD variable by searching for it first in a local .env file and then in the host machine's environment variables.
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB=trading_db
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # Exposes the database port to the host, allowing external tools to connect for debugging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading_user -d trading_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  trading-bot:
+    # Build the image from the Dockerfile in the current directory
+    build: .
+    # Name the image
+    image: patf-trading-framework:latest
+    # Load environment variables from the host machine
+    environment:
+      - APCA_API_KEY_ID
+      - APCA_API_SECRET_KEY
+      - ALPACA_BASE_URL=https://paper-api.alpaca.markets
+      - PYTHONUNBUFFERED=1
+      # Environment variables for the database connection
+      - DB_HOST=db # Use the service name ('db') as the hostname to connect to the database container
+      - DB_PORT=5432
+      - DB_USER=trading_user
+      # Like the database password, this value is also loaded automatically from the .env file.
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=trading_db
+    # Mount the output directory for persistent data
+    volumes:
+      - ./output:/app/output
+    # Ensure the container stops gracefully
+    stop_grace_period: 1m
+    # Restart policy (optional, but useful for production)
+    restart: unless-stopped
+    # Ensures this service waits for the database to be healthy before starting
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  timescale_data:

@@ -1,0 +1,151 @@
+# --- API and Broker Configuration ---
+alpaca:
+  # Using placeholders for environment variables, will be loaded from .env file, these values will be overridden if present
+  api_key: ${APCA_API_KEY_ID}
+  secret_key: ${APCA_API_SECRET_KEY}
+  base_url: ${ALPACA_BASE_URL}
+
+# --- General Data Configuration ---
+data:
+  ticker: "SPY"
+  timeframe_value: 15
+  timeframe_unit: "Minute" # 'Minute', 'Hour', 'Day'
+  start_date: "2023-01-01"
+  end_date: "2023-06-30" # Extended 6-month period for meaningful back-testing
+  resample_freq_template: '{timeframe_value}min'
+
+# --- File and Directory Paths ---
+paths:
+  output_dir: "output"
+  log_dir: "output/logs"
+  chart_dir: "output/charts"
+  cache_dir: "output/cache"
+
+# --- Database Configuration ---
+# The following values use the syntax ${VARIABLE:-default}, which provides
+# a fallback value if the corresponding environment variable is not set.
+database:
+  host: ${DB_HOST:-localhost}
+  port: ${DB_PORT:-5432}
+  user: ${DB_USER:-trading_user}
+  password: ${DB_PASSWORD:-strong_password}
+  dbname: ${DB_NAME:-trading_db}
+
+# --- Backtest Configuration ---
+backtest:
+  initial_cash: 100000.0
+  commission: 0.001
+  slippage_perc: 0.001 # Percentage slippage for trades
+  max_cpus: "auto" # 'auto' will use cpu_count - 1
+
+# --- Strategy Configurations ---
+strategies:
+
+  mean_reversion:
+    name: 'Mean Reversion (Z-Score)'
+    class_name: 'MeanReversionZScoreStrategy'
+    use_filtered_data: True
+    # Single run parameters, also used as defaults for optimization
+    params:
+      zscore_period: 20
+      zscore_upper: 2.0
+      zscore_lower: -2.0
+      exit_threshold: 0.0
+      use_filtered_price: True
+      printlog: False
+    # Optimization parameter ranges (for cerebro.optstrategy)
+    opt_ranges:
+      zscore_period: [20, 30]
+      zscore_upper: [2.0]
+      zscore_lower: [-2.0]
+      exit_threshold: [0.0]
+    # Order settings
+    order_settings:
+      entry_order_type: 'limit'
+      exit_order_type: 'market'
+      limit_price_offset_pct: 0.0005  # 0.05% offset to increase fill chance
+
+  ema_crossover:
+    name: 'Trend Following (EMA+ADX)'
+    class_name: 'EMACrossoverStrategy'
+    use_filtered_data: False
+    params:
+      ema_short: 10
+      ema_long: 30
+      adx_period: 14
+      adx_threshold: 25.0
+      use_filtered_price: False
+      printlog: False
+    opt_ranges:
+      ema_short: [10]
+      ema_long: [30]
+      adx_period: [14]
+      adx_threshold: [25.0, 30.0]
+    # Order settings
+    order_settings:
+      entry_order_type: 'market'
+      exit_order_type: 'trailing_stop' # Logic handled in client
+      trailing_stop_pct: 0.015 # 1.5% trailing stop
+
+  custom_ratio:
+    name: 'Custom Ratio Strategy'
+    class_name: 'CustomRatioStrategy'
+    use_filtered_data: False
+    params:
+      long_ma_period: 50
+      buy_threshold: 0.99999
+      sell_threshold: 1.00001
+      exit_threshold: 1.0
+      use_filtered_price: False
+      printlog: True
+    opt_ranges:
+      long_ma_period: [50]
+      buy_threshold: [0.98, 0.95]
+      sell_threshold: [1.02]
+      exit_threshold: [1.0]
+    # Order settings
+    order_settings:
+      entry_order_type: 'market'
+      exit_order_type: 'market'
+
+# --- Live Trading Configuration ---
+live_trading:
+  symbol: "AAPL"
+  initial_capital: 100000
+  
+  # --- No-Fill Test Mode Configuration ---
+  no_fill_test_mode:
+    enabled: false  # Set to true to enable no-fill testing
+    price_offset_pct: 0.10  # 10% price offset to ensure orders don't fill
+    test_duration_seconds: 60  # Auto-cancel orders after this duration
+    max_test_orders: 5  # Maximum number of test orders to place
+    
+  risk_limits:
+
+    # --- Value at Risk (VaR) and Conditional Value at Risk (CVaR) ---
+
+    max_var: 0.05
+    max_concentration: 0.3
+    min_liquidity: 1000000
+
+    # --- Liquidity and Impact Limits ---
+    max_order_participation_ratio: 0.02 # Order size not to exceed 2% of the trading volume in the past N minutes
+    max_bid_ask_spread_pct: 0.005 # Maximum acceptable bid-ask spread percentage (0.5%)
+    market_impact_coefficient: 0.5 # Market impact cost model coefficient (for the square root model)
+
+    # --- Leverage and Exposure Limits ---
+    max_gross_exposure: 1.5 # Maximum gross exposure (absolute value of long + short positions) / portfolio net value, e.g., 1.5 represents 150%
+    max_leverage: 2.0 # Maximum leverage: Total Assets / Net Value
+
+# --- Logging Configuration ---
+logging:
+  level: "DEBUG" # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  datefmt: '%Y-%m-%d %H:%M:%S'
+
+# --- Plotting Configuration ---
+plotting:
+  enabled: True
+  style: 'candlestick'
+  barup: 'green'
+  bardown: 'red'
