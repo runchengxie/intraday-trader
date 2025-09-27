@@ -121,7 +121,7 @@ flowchart LR
 
 2. **安装依赖**
    ```bash
-   uv pip install -e .[dev]
+   uv sync
    ```
 
 3. **配置凭证**
