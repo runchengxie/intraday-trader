@@ -31,19 +31,14 @@ dependencies = [
     "numpy==1.26.4",
     "pyyaml",
     "matplotlib>=3.5",
-    "seaborn>=0.12",
     "requests>=2.28",
     "python-dotenv>=0.21",
     "pyarrow>=11.0",
     "websockets>=10.0",
-    "pandas-ta==0.3.14b0",
-    "pykalman",
     "scipy>=1.8",
     "alpaca-trade-api",
     "backtrader",
     "sqlalchemy>=2.0",
-    "psycopg2-binary",
-    "streamlit",
 ]
 
 # Optional dependencies: 'dev' includes all tools for development, testing, and code quality.
@@ -61,6 +56,15 @@ dev = [
     "pre-commit",        # For automatically running checks before commits
     "jupyterlab",        # For running and developing notebooks
     "ipykernel",         # To make the project's venv available in Jupyter
+]
+
+postgres = [
+    "psycopg2-binary",
+]
+
+dashboard = [
+    "streamlit",
+    "seaborn>=0.12",
 ]
 
 # Define script entry points, allowing them to be run from the command line after installation.

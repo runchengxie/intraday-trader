@@ -1,15 +1,29 @@
-import pytest
-import logging
-import time
 import asyncio
-from unittest.mock import MagicMock
+import logging
+import os
+import time
 import uuid
 
-# Mark the entire module as asyncio-powered for pytest
-pytestmark = pytest.mark.asyncio
+import pytest
 
-# Import the class to be tested
-from src.patf_trading_framework.broker_handler import BrokerAPIHandler
+pytest.importorskip("pytest_asyncio")
+pytest.importorskip("alpaca_trade_api")
+
+from patf_trading_framework.broker_handler import BrokerAPIHandler
+
+REQUIRED_ENV_VARS = ["APCA_API_KEY_ID", "APCA_API_SECRET_KEY"]
+
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
+
+missing_creds = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+if missing_creds:
+    pytestmark.append(
+        pytest.mark.skip(
+            reason=(
+                "Alpaca credentials missing: set {} to run broker integration tests"
+            ).format(", ".join(missing_creds))
+        )
+    )
 
 # --- Test Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

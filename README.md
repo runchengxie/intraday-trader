@@ -1,6 +1,8 @@
 # Python Algorithmic Trading Framework
 
-This project is a modern, installable Python framework designed for developing, back-testing, and deploying algorithmic trading strategies. It provides a robust suite of tools for persisting market data in a high-performance TimescaleDB database, managing risk, analyzing performance, and connecting to a paper trading account using the Alpaca API.
+> [查看中文说明](README.zh.md)
+
+This project is a modern, installable Python framework designed for developing, back-testing, and deploying algorithmic trading strategies. It now defaults to a lightweight SQLite cache for persistence so you can iterate locally without standing up infrastructure, while still providing optional TimescaleDB integration for heavier workloads. The framework includes tools for risk management, performance analysis, and connecting to a paper trading account using the Alpaca API.
 
 The architecture is containerized, automated, and built for durability and performance, making it suitable for both rigorous back-testing and resilient live trading operations.
 
@@ -12,7 +14,7 @@ The architecture is containerized, automated, and built for durability and perfo
 
 * **Installable Package with CLI Tools**: Packaged for easy installation and use with command-line entry points for all major functions (live trading, backtesting, data updates, and reporting).
 
-* **Persistent & Performant Data Layer**: At its core lies a TimescaleDB database that serves as a "single source of truth" for historical market data and live trade logs, minimizing API calls and ensuring data integrity.
+* **Persistent & Performant Data Layer**: Start with the bundled SQLite-backed cache for a frictionless setup, and graduate to TimescaleDB when you truly need hypertables and horizontal scaling.
 
 * **Flexible Strategy Framework**: Easily define, configure, and switch between multiple trading strategies. The project includes implementations for:
   

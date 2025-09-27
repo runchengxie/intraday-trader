@@ -1,12 +1,15 @@
-import pytest
-import pandas as pd
-import numpy as np
 import json
 from datetime import datetime, timedelta
-from pathlib import Path
 
-# Import the classes to be tested
-from src.patf_trading_framework.performance_analyzer import PerformanceAnalyzer, TradeRecord
+import pytest
+
+pd = pytest.importorskip("pandas")
+np = pytest.importorskip("numpy")
+
+from patf_trading_framework.performance_analyzer import (
+    PerformanceAnalyzer,
+    TradeRecord,
+)
 
 # --- Pytest Fixtures ---
 

@@ -1,9 +1,10 @@
-import pytest
-import numpy as np
 from datetime import datetime
 
-# Import the class to be tested
-from src.patf_trading_framework.risk_manager import RiskManager
+import pytest
+
+np = pytest.importorskip("numpy")
+
+from patf_trading_framework.risk_manager import RiskManager
 
 # --- Pytest Fixtures ---
 
