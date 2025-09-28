@@ -68,6 +68,7 @@ class DataConfig:
     start_date: str
     end_date: str
     adjustment: str = "raw"
+    require_full_fields: bool = False
 
     @property
     def timeframe(self) -> str:
@@ -196,6 +197,7 @@ def _validate_data_config(data: Mapping[str, Any]) -> DataConfig:
         start_date=data["start_date"],
         end_date=data["end_date"],
         adjustment=adjustment,
+        require_full_fields=bool(data.get("require_full_fields", False)),
     )
 
 

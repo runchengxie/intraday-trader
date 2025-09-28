@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import Column, DateTime, Float, String, create_engine, text
+from sqlalchemy import Column, DateTime, Float, Integer, String, create_engine, text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -21,6 +21,8 @@ class MarketData(Base):
     low = Column(Float)
     close = Column(Float)
     volume = Column(Float)
+    trade_count = Column(Integer)
+    vwap = Column(Float)
 
 
 class TradeLog(Base):
@@ -109,6 +111,8 @@ class DBHandler:
 
             if self.backend in {"postgres", "postgresql"}:
                 self._ensure_timescale_hypertables()
+
+            self._ensure_market_data_columns()
         except ProgrammingError as e:
             if self.backend in {
                 "postgres",
@@ -172,6 +176,50 @@ class DBHandler:
 
             conn.commit()
 
+    def _ensure_market_data_columns(self):
+        if self.backend == "parquet" or not self.engine:
+            return
+
+        required_columns = {
+            "trade_count": "INTEGER",
+            "vwap": "REAL",
+        }
+
+        index_statement = text(
+            "CREATE INDEX IF NOT EXISTS idx_market_data_symbol_ts "
+            "ON market_data (symbol, timestamp);"
+        )
+
+        with self.engine.begin() as conn:
+            if self.backend == "sqlite":
+                existing = {
+                    row[1]
+                    for row in conn.execute(text("PRAGMA table_info('market_data');"))
+                }
+            else:
+                existing = {
+                    row[0]
+                    for row in conn.execute(
+                        text(
+                            "SELECT column_name FROM information_schema.columns "
+                            "WHERE table_name = 'market_data';"
+                        )
+                    )
+                }
+
+            for column, sql_type in required_columns.items():
+                if column not in existing:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE market_data ADD COLUMN {column} {sql_type};"
+                        )
+                    )
+                    logger.info(
+                        "Added missing column '%s' to market_data table.", column
+                    )
+
+            conn.execute(index_statement)
+
     # ------------------------------------------------------------------
     # Market data helpers
     # ------------------------------------------------------------------
@@ -195,6 +243,10 @@ class DBHandler:
             errors="ignore",
         )
 
+        for column, default in ("trade_count", 0), ("vwap", None):
+            if column not in df_to_save.columns:
+                df_to_save[column] = default
+
         temp_table_name = "temp_market_data_upload"
         df_to_save.to_sql(
             temp_table_name, self.engine, if_exists="replace", index=False
@@ -203,17 +255,32 @@ class DBHandler:
         if self.backend == "sqlite":
             upsert_statement = text(
                 f"""
-                INSERT OR IGNORE INTO market_data (timestamp, symbol, open, high, low, close, volume)
-                SELECT timestamp, symbol, open, high, low, close, volume FROM {temp_table_name};
-            """
+                INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+                SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
+                ON CONFLICT(timestamp, symbol) DO UPDATE SET
+                    open=excluded.open,
+                    high=excluded.high,
+                    low=excluded.low,
+                    close=excluded.close,
+                    volume=excluded.volume,
+                    trade_count=excluded.trade_count,
+                    vwap=excluded.vwap;
+                """
             )
         else:
             upsert_statement = text(
                 f"""
-                INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume)
-                SELECT timestamp, symbol, open, high, low, close, volume FROM {temp_table_name}
-                ON CONFLICT (timestamp, symbol) DO NOTHING;
-            """
+                INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+                SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
+                ON CONFLICT (timestamp, symbol) DO UPDATE SET
+                    open = EXCLUDED.open,
+                    high = EXCLUDED.high,
+                    low = EXCLUDED.low,
+                    close = EXCLUDED.close,
+                    volume = EXCLUDED.volume,
+                    trade_count = EXCLUDED.trade_count,
+                    vwap = EXCLUDED.vwap;
+                """
             )
 
         rows_inserted = 0
@@ -236,6 +303,10 @@ class DBHandler:
         path = self._parquet_table_path("market_data")
         df = df.reset_index()
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        if "trade_count" not in df.columns:
+            df["trade_count"] = 0
+        if "vwap" not in df.columns:
+            df["vwap"] = None
         if path.exists():
             existing = pd.read_parquet(path)
             existing["timestamp"] = pd.to_datetime(
@@ -523,6 +594,10 @@ class DBHandler:
                 len(df),
                 df.iloc[0].get("symbol", "?"),
             )
+
+        for column in ("trade_count", "vwap"):
+            if column not in df.columns:
+                df[column] = pd.NA
         return df
 
     def _parquet_table_path(self, name: str) -> Path:
