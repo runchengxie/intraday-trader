@@ -1,23 +1,31 @@
-# Python 算法交易框架（中文指南）
+# 高频日内交易机器人
 
-本项目提供一个现代化、可安装的 Python 框架，用于开发、回测与部署算法交易策略。默认采用轻量级的 SQLite/Parquet 缓存，方便在本地快速迭代；当需要更高性能或横向扩展时，可以通过 `config.yml` 切换到 TimescaleDB。框架内置风险管理、绩效分析和 Alpaca 纸上交易 API 接入等组件，目标是让“课堂作业级”的原型具备真实可运行、可维护的工程化能力。
+本项目提供一个现代化、可安装的Python自动交易机器人，用于开发、回测与部署算法交易策略。默认采用轻量级的 SQLite/Parquet 缓存，方便在本地快速迭代；当需要更高性能或横向扩展时，可以通过 `config.yml` 切换到 TimescaleDB。该项目内置风险管理、绩效分析和Alpaca纸上交易API接入（有利于预演策略的效果）等组件，注意券商的实盘的日内交易一般都有一定的最低资本要求。
 
-## 为何说它已经具备工程化素质？
+## 项目设计思路
 
-### 可复现的运行面
-- **多阶段 Docker 构建**：`Dockerfile` 使用 builder/runner 双阶段，先在完整镜像中构建 wheel，再在瘦身镜像中安装产物，默认启动命令即为 `run-live`，从构建到运行全流程封装。 
-- **Compose Profiles 分层**：`docker-compose.yml` 将 TimescaleDB 与交易服务分别挂在 `db`、`live` profile 下，既可单独调试数据库，也能一次拉起完整实盘栈；健康检查和依赖顺序都已声明。 
-- **输出挂载与 .dockerignore**：容器默认把 `./output` 映射到 `/app/output`，配合 `.dockerignore` 隔离本地缓存与敏感文件，便于落地部署。
+### 支持服务器端的远程部署值守交易
+
+* 多阶段 Docker 构建：`Dockerfile` 使用 builder/runner 双阶段，先在完整镜像中构建 wheel，再在瘦身镜像中安装产物，默认启动命令即为 `run-live`，从构建到运行全流程封装。
+
+* Compose Profiles 分层：`docker-compose.yml` 将 TimescaleDB 与交易服务分别挂在 `db`、`live` profile 下，既可单独调试数据库，也能一次拉起完整实盘栈；健康检查和依赖顺序都已声明。
+
+* 输出挂载与 .dockerignore：容器默认把 `./output` 映射到 `/app/output`，配合 `.dockerignore` 隔离本地缓存与敏感文件，便于落地部署。
 
 ### 可安装的 CLI 与脚本分发
-- `pyproject.toml` 声明 `patf` 顶层命令，并在其下挂载 `backtest run/optimise/benchmark`、`update-data`、`live` 等子命令，安装后即可在任意环境调用。
-- `src/patf_trading_framework/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
+
+* `pyproject.toml` 声明 `patf` 顶层命令，并在其下挂载 `backtest run/optimise/benchmark`、`update-data`、`live` 等子命令，安装后即可在任意环境调用。
+
+* `src/patf_trading_framework/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
 
 ### 数据持久化与配置解耦
-- `config.yml` 中的 `database.backend` 支持 `sqlite`、`parquet` 与 `postgresql`，配合 `DBHandler` 可在无需改动代码的情况下切换存储。 
-- `.env.example`、`.envrc.example` 提供标准化的密钥注入与虚拟环境自动化脚本，支持 `uv`、`pip` 双方案回退。
+
+* `config.yml` 中的 `database.backend` 支持 `sqlite`、`parquet` 与 `postgresql`，配合 `DBHandler` 可在无需改动代码的情况下切换存储。
+
+* `.env.example`、`.envrc.example` 提供标准化的密钥注入与虚拟环境自动化脚本，支持 `uv`、`pip` 双方案回退。
 
 ### 已覆盖的运行场景
+
 | 场景 | 推荐方式 | 说明 |
 | --- | --- | --- |
 | 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .` 后即可使用 CLI，默认包含开发工具链。 |
@@ -87,27 +95,34 @@ flowchart LR
 
 ### 方式一：Docker（按需，可复现/部署用）
 
-1. **克隆仓库**
+1. 克隆仓库
+
    ```bash
    git clone https://github.com/runchengxie/algorithmic-trading-framework.git
    cd algorithmic-trading-framework
    ```
-2. **创建环境变量文件**
+
+2. 创建环境变量文件
+
    ```bash
    cp .env.example .env
    ```
+
    如果需要 TimescaleDB，请额外在 `.env` 中定义 `POSTGRES_PASSWORD`，并确保密钥不会提交到版本库。
-3. **启动服务**
+3. 启动服务
+
    ```bash
    # 等价命令：make docker-live
    docker compose --profile live up trading-bot
    ```
+
    `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
    Docker Compose 会自动将数据库连接字段（`DB_BACKEND=postgresql` 以及 `DB_HOST/PORT/USER/PASSWORD/NAME`）注入交易容器，对应的 `config.yml` 会读取这些环境变量完成 TimescaleDB 对接。
 
 ### 方式二：本地 Python 环境
 
-1. **创建虚拟环境**
+1. 创建虚拟环境
+
    ```bash
    # 推荐使用 uv
    uv venv
@@ -117,27 +132,41 @@ flowchart LR
    # python -m venv .venv
    # source .venv/bin/activate
    ```
-2. **安装依赖并注册 CLI 命令**
+
+2. 安装依赖并注册 CLI 命令
+
    ```bash
    uv sync
    uv pip install -e .
    ```
+
    `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。
-3. **配置凭证**
+
+3. 配置凭证
+
    将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
+
    ```bash
    export APCA_API_KEY_ID="你的 Key"
    export APCA_API_SECRET_KEY="你的 Secret"
    export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
    ```
-4. **运行命令行工具**
-   - 更新行情数据：`patf update-data`
-   - 回测策略：`patf backtest run`
-   - 参数优化：`patf backtest optimise`
-   - 基准对比：`patf backtest benchmark`
-   - 生成报表：`patf generate-report`
-   - 启动纸上交易：`patf live`
-   - 启动仪表盘：`patf dashboard`
+
+4. 运行命令行工具
+
+   * 更新行情数据：`patf update-data`
+
+   * 回测策略：`patf backtest run`
+
+   * 参数优化：`patf backtest optimise`
+
+   * 基准对比：`patf backtest benchmark`
+
+   * 生成报表：`patf generate-report`
+
+   * 启动纸上交易：`patf live`
+
+   * 启动仪表盘：`patf dashboard`
 
    若需仪表盘，安装时请带上 `dashboard` 可选依赖：
 
@@ -148,6 +177,7 @@ flowchart LR
    ```
 
 ### 常用 Make 命令
+
 ```bash
 make help           # 查看所有常用命令
 make backtest       # 本地回测
@@ -168,23 +198,33 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 | `backtest benchmark` | 仅运行基准 | 运行配置中的基准策略，可选计算含分红总回报 | 基准指标与图表 |
 | `generate-report` | 汇总交易日志与绩效快照生成日报 | 从数据库提取 24 小时交易与绩效数据，调用 `PerformanceAnalyzer` 输出报告 | `output/daily_report_YYYYMMDD.json` |
 | `live` | 启动纸上交易执行引擎 | 初始化 `EnhancedTradingSystem`、订阅 Alpaca WebSocket、前置风险检查、异步处理订单 | `output/logs/` 中的实时日志、数据库中的交易/绩效快照 |
-| `dashboard` | 启动 Streamlit 仪表盘 | 调用 `streamlit run dashboard_app.py` 并监听本地端口 | Web UI（默认 http://localhost:8501） |
+| `dashboard` | 启动 Streamlit 仪表盘 | 调用 `streamlit run dashboard_app.py` 并监听本地端口 | Web UI（默认 <http://localhost:8501）> |
 
 ### 命令详解
-- **update-data**：脚本会先加载 `.env`，然后根据 `config.yml` 中的 `data.ticker` 与时间范围决定拉取的标的与窗口，支持向缓存目录写入 Parquet 文件并通过 `DBHandler.initialize_db()` 创建所需表结构。
-- **backtest run**：除策略回测外，会根据 `config.yml.paths` 自动创建日志、图表、缓存目录，并把运行日志写入 `output/logs/trading_log_*.log`。若配置基准并启用 `benchmark.total_return`，会自动汇总股息到总回报指标。
-- **backtest optimise**：尊重 `backtest.max_cpus` 并行执行参数搜索，输出 `Final Value`、`Sharpe Ratio` 等指标的前十名列表。
-- **backtest benchmark**：只运行基准策略，适合在 CI 中做快速健诊，也可以单独查看含分红/不含分红的收益差异。
-- **generate-report**：默认取最近 24 小时的交易与绩效快照，借助 `PerformanceAnalyzer.generate_performance_report()` 生成 JSON 文档，便于上游任务继续处理或推送。
-- **live**：`EnhancedTradingSystem` 内部组合了 `RiskManager`、`PerformanceAnalyzer`、`ConsistencyValidator` 与 `BrokerAPIHandler`，所有订单在入队前都会通过风险检查；同时支持 `no_fill_test_mode` 进行“不会成交”的联调演练。
-- **dashboard**：如果仓库安装了 `dashboard` 可选依赖，会启动 Streamlit 应用，实时展示数据库中的账户表现与风险指标。
+
+* update-data：脚本会先加载 `.env`，然后根据 `config.yml` 中的 `data.ticker` 与时间范围决定拉取的标的与窗口，支持向缓存目录写入 Parquet 文件并通过 `DBHandler.initialize_db()` 创建所需表结构。
+
+* backtest run：除策略回测外，会根据 `config.yml.paths` 自动创建日志、图表、缓存目录，并把运行日志写入 `output/logs/trading_log_*.log`。若配置基准并启用 `benchmark.total_return`，会自动汇总股息到总回报指标。
+
+* backtest optimise：尊重 `backtest.max_cpus` 并行执行参数搜索，输出 `Final Value`、`Sharpe Ratio` 等指标的前十名列表。
+
+* backtest benchmark：只运行基准策略，适合在 CI 中做快速健诊，也可以单独查看含分红/不含分红的收益差异。
+
+* generate-report：默认取最近 24 小时的交易与绩效快照，借助 `PerformanceAnalyzer.generate_performance_report()` 生成 JSON 文档，便于上游任务继续处理或推送。
+
+* live：`EnhancedTradingSystem` 内部组合了 `RiskManager`、`PerformanceAnalyzer`、`ConsistencyValidator` 与 `BrokerAPIHandler`，所有订单在入队前都会通过风险检查；同时支持 `no_fill_test_mode` 进行“不会成交”的联调演练。
+
+* dashboard：如果仓库安装了 `dashboard` 可选依赖，会启动 Streamlit 应用，实时展示数据库中的账户表现与风险指标。
 
 ## 配置、环境与密钥管理
 
-- `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `UV_NO_DEV=1` 禁用开发依赖。
-- `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。数据库段默认回落到本地 SQLite，当注入 `DB_BACKEND=postgresql` 时则使用 `DB_HOST/PORT/USER/PASSWORD/NAME` 与 TimescaleDB 建立连接。
-- Docker 场景：`docker-compose.yml` 会把主机的环境变量透传给交易容器，并通过卷挂载持久化输出目录；TimescaleDB 密码同样从 `.env` 自动注入。
-- 安全提醒：永远不要把密钥写入版本库，可将 `.env`、`.envrc` 保持在本地，同时利用 `.dockerignore` 避免构建镜像时打包敏感文件。
+* `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `UV_NO_DEV=1` 禁用开发依赖。
+
+* `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。数据库段默认回落到本地 SQLite，当注入 `DB_BACKEND=postgresql` 时则使用 `DB_HOST/PORT/USER/PASSWORD/NAME` 与 TimescaleDB 建立连接。
+
+* Docker 场景：`docker-compose.yml` 会把主机的环境变量透传给交易容器，并通过卷挂载持久化输出目录；TimescaleDB 密码同样从 `.env` 自动注入。
+
+* 安全提醒：永远不要把密钥写入版本库，可将 `.env`、`.envrc` 保持在本地，同时利用 `.dockerignore` 避免构建镜像时打包敏感文件。
 
 ## 风控参数与执行流程
 
@@ -204,10 +244,14 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 ## 实盘运行与组件职责
 
 `run_live_trading.py` 中的 `EnhancedTradingSystem` 以异步队列为中心组织事件流：
-- **数据通路**：`BrokerAPIHandler` 订阅行情与订单状态，通过 `asyncio.Queue` 推给策略与风控组件；断线自动重连，并在更新时记录详细日志。
-- **风险管理**：`RiskManager` 在订单生成前执行流动性、敞口、VaR 等校验；`ConsistencyValidator` 负责检查状态一致性与异常回调。
-- **绩效追踪**：`PerformanceAnalyzer` 按分钟写入投资组合快照，可配合 `DBHandler.log_performance_snapshot()` 存档，供日报与仪表盘读取。
-- **联调模式**：`no_fill_test_mode` 允许注入永不成交的测试单（通过价格偏移和自动撤单），用于验证消息流与风控逻辑。
+
+* 数据通路：`BrokerAPIHandler` 订阅行情与订单状态，通过 `asyncio.Queue` 推给策略与风控组件；断线自动重连，并在更新时记录详细日志。
+
+* 风险管理：`RiskManager` 在订单生成前执行流动性、敞口、VaR 等校验；`ConsistencyValidator` 负责检查状态一致性与异常回调。
+
+* 绩效追踪：`PerformanceAnalyzer` 按分钟写入投资组合快照，可配合 `DBHandler.log_performance_snapshot()` 存档，供日报与仪表盘读取。
+
+* 联调模式：`no_fill_test_mode` 允许注入永不成交的测试单（通过价格偏移和自动撤单），用于验证消息流与风控逻辑。
 
 ## 自动化调度（可选模板）
 
@@ -223,11 +267,15 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 ## Roadmap / 已知局限
 
-- **成交模型待加强**：当前冲击成本为静态系数，后续计划引入基于订单簿深度的动态模型。 
-- **执行算法有限**：实盘仅提供均值回归策略，后续会补充 VWAP/TWAP 等算法。 
-- **回测逼真度**：仍待模拟交易所费用、断路器、撮合延迟等细节；当前版本已支持基准含分红收益与 `max_cpus` 自适应，但真实成交建模仍有提升空间。
-- **策略扩展**：虽有策略注册表，但缺少模板与文档指导多标的、多频率策略的接入。 
-- **回放测试**：目前无历史行情回放的集成测试场景，建议未来补充。
+* 成交模型待加强：当前冲击成本为静态系数，后续计划引入基于订单簿深度的动态模型。
+
+* 执行算法有限：实盘仅提供均值回归策略，后续会补充 VWAP/TWAP 等算法。
+
+* 回测逼真度：仍待模拟交易所费用、断路器、撮合延迟等细节；当前版本已支持基准含分红收益与 `max_cpus` 自适应，但真实成交建模仍有提升空间。
+
+* 策略扩展：虽有策略注册表，但缺少模板与文档指导多标的、多频率策略的接入。
+
+* 回放测试：目前无历史行情回放的集成测试场景，建议未来补充。
 
 ## 项目结构
 
@@ -247,11 +295,18 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 ## 常见问题（FAQ）
 
-1. **一定要用 TimescaleDB 吗？** 不需要。默认使用 SQLite/Parquet 缓存，等需要更长历史或多标的并发查询时，再切换到 TimescaleDB 即可。
-2. **Alpaca 账号必须是真实资金吗？** 不需要。推荐使用 Alpaca Paper Trading（模拟账户）完成联调。
-3. **Docker 是必须的吗？** 不是。Docker 仅提供可复现环境，本地虚拟环境照样可以直接运行脚本。
-4. **如何扩展新策略？** 在 `src/patf_trading_framework/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
-5. **如何切换数据存储后端？** 编辑 `config.yml` 的 `database` 配置块即可。示例：
-   - 使用 SQLite：保持默认 `backend: sqlite` 与 `path: output/trading.db`
-   - 使用 Parquet：设置 `backend: parquet` 并调整 `path`
-   - 使用 TimescaleDB/PostgreSQL：设置 `backend: postgresql`，并通过环境变量或直接在配置中补充 `host/port/user/password/dbname`
+1. 一定要用 TimescaleDB 吗？ 不需要。默认使用 SQLite/Parquet 缓存，等需要更长历史或多标的并发查询时，再切换到 TimescaleDB 即可。
+
+2. Alpaca 账号必须是真实资金吗？ 不需要。推荐使用 Alpaca Paper Trading（模拟账户）完成联调。
+
+3. Docker 是必须的吗？ 不是。Docker 仅提供可复现环境，本地虚拟环境照样可以直接运行脚本。
+
+4. 如何扩展新策略？ 在 `src/patf_trading_framework/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
+
+5. 如何切换数据存储后端？ 编辑 `config.yml` 的 `database` 配置块即可。示例：
+
+   * 使用 SQLite：保持默认 `backend: sqlite` 与 `path: output/trading.db`
+
+   * 使用 Parquet：设置 `backend: parquet` 并调整 `path`
+
+   * 使用 TimescaleDB/PostgreSQL：设置 `backend: postgresql`，并通过环境变量或直接在配置中补充 `host/port/user/password/dbname`
