@@ -3,9 +3,10 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from .plotting import plot_from_analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -646,109 +647,16 @@ class PerformanceAnalyzer:
 
         return json.dumps(report, indent=4, default=default_converter)
 
-    def plot_performance_charts(self, save_path: str = None):
-        """
-        Plot performance charts
+    def plot_performance_charts(self, save_path: str | None = None):
+        """Plot strategy and benchmark performance summary charts."""
 
-        Args:
-            save_path: Save path, if None then display charts
-        """
         if not self.portfolio_values:
             logger.warning("No portfolio value data available for plotting")
             return
 
-        # Create subplots
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle("Algorithmic Trading Performance Analysis", fontsize=16)
-
-        # 1. Portfolio Value Over Time
-        portfolio_df = pd.DataFrame(
-            self.portfolio_values, columns=["timestamp", "value"]
+        plot_from_analyzer(
+            self,
+            out_path=save_path,
+            title="Algorithmic Trading Performance",
+            show=save_path is None,
         )
-        portfolio_df.set_index("timestamp", inplace=True)
-
-        axes[0, 0].plot(portfolio_df.index, portfolio_df["value"], label="Strategy")
-        if self.benchmark_returns is not None and not self.benchmark_returns.empty:
-            benchmark_curve = (1 + self.benchmark_returns).cumprod()
-            benchmark_curve = benchmark_curve.reindex(
-                portfolio_df.index, method="ffill"
-            )
-            if benchmark_curve.dropna().empty:
-                logger.warning(
-                    "Benchmark curve could not be aligned for plotting; skipping overlay."
-                )
-            else:
-                scaled_benchmark = benchmark_curve * (
-                    self.initial_capital / benchmark_curve.dropna().iloc[0]
-                )
-                axes[0, 0].plot(
-                    scaled_benchmark.index,
-                    scaled_benchmark,
-                    label=self.benchmark_name,
-                    linestyle="--",
-                )
-        axes[0, 0].axhline(
-            y=self.initial_capital,
-            color="r",
-            linestyle="--",
-            alpha=0.7,
-            label="Initial Capital",
-        )
-        axes[0, 0].set_title("Portfolio Value Over Time")
-        axes[0, 0].set_ylabel("Value")
-        axes[0, 0].legend()
-        axes[0, 0].grid(True, alpha=0.3)
-
-        # 2. Drawdown Curve
-        cumulative_returns = portfolio_df["value"] / self.initial_capital
-        running_max = cumulative_returns.expanding().max()
-        drawdown = (cumulative_returns - running_max) / running_max
-
-        axes[0, 1].fill_between(drawdown.index, drawdown, 0, alpha=0.3, color="red")
-        axes[0, 1].plot(drawdown.index, drawdown, color="red")
-        axes[0, 1].set_title("Drawdown Curve")
-        axes[0, 1].set_ylabel("Drawdown Ratio")
-        axes[0, 1].grid(True, alpha=0.3)
-
-        # 3. Returns Distribution
-        returns = self.calculate_returns()
-        if len(returns) > 0:
-            axes[1, 0].hist(returns, bins=50, alpha=0.7, edgecolor="black")
-            axes[1, 0].axvline(
-                returns.mean(),
-                color="red",
-                linestyle="--",
-                label=f"Mean: {returns.mean():.4f}",
-            )
-            axes[1, 0].set_title("Returns Distribution")
-            axes[1, 0].set_xlabel("Daily Returns")
-            axes[1, 0].set_ylabel("Frequency")
-            axes[1, 0].legend()
-            axes[1, 0].grid(True, alpha=0.3)
-
-        # 4. Rolling Sharpe Ratio
-        if len(returns) >= 30:
-            rolling_sharpe = (
-                returns.rolling(window=30).mean()
-                / returns.rolling(window=30).std()
-                * np.sqrt(252)
-            )
-            axes[1, 1].plot(rolling_sharpe.index, rolling_sharpe)
-            axes[1, 1].axhline(y=0, color="black", linestyle="-", alpha=0.3)
-            axes[1, 1].axhline(
-                y=1, color="green", linestyle="--", alpha=0.7, label="Sharpe Ratio = 1"
-            )
-            axes[1, 1].set_title("Rolling Sharpe Ratio (30 Days)")
-            axes[1, 1].set_ylabel("Sharpe Ratio")
-            axes[1, 1].legend()
-            axes[1, 1].grid(True, alpha=0.3)
-
-        plt.tight_layout()
-
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches="tight")
-            logger.info(f"Performance chart saved to: {save_path}")
-        else:
-            plt.show()
-
-        plt.close()
