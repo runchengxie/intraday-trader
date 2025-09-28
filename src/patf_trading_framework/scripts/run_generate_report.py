@@ -1,46 +1,16 @@
 import logging
+import logging
 import os
-import re
-import sys
+from dataclasses import asdict
 from datetime import datetime, timedelta
+from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
 
+from patf_trading_framework.configuration import load_app_config
 from patf_trading_framework.db_handler import DBHandler
+from patf_trading_framework.logging_utils import ensure_directory
 from patf_trading_framework.performance_analyzer import PerformanceAnalyzer
-
-
-def _sub_env(s: str) -> str:
-    """
-    Replace ${VAR} and ${VAR:-default} with env values.
-    """
-
-    def repl(m):
-        expr = m.group(1)
-        if ":-" in expr:
-            var, default = expr.split(":-", 1)
-            return os.getenv(var, default)
-        return os.getenv(expr, m.group(0))
-
-    return re.sub(r"\$\{([^}]+)\}", repl, s)
-
-
-def load_config(config_path):
-    """Load configuration from YAML file with environment variable substitution."""
-    try:
-        with open(config_path, encoding="utf-8") as f:
-            raw_content = f.read()
-        # Substitute environment variables before parsing
-        substituted_content = _sub_env(raw_content)
-        config = yaml.safe_load(substituted_content)
-        return config
-    except FileNotFoundError:
-        logging.error(f"Configuration file not found at: {config_path}")
-        sys.exit(1)
-    except yaml.YAMLError as e:
-        logging.error(f"Error parsing configuration file '{config_path}': {e}")
-        sys.exit(1)
 
 
 def main():
@@ -58,9 +28,9 @@ def main():
     # Load environment variables from .env file first
     load_dotenv(dotenv_path=dotenv_path)
 
-    config = load_config(config_path)
+    config = load_app_config(Path(config_path))
 
-    db_handler = DBHandler(config["database"])
+    db_handler = DBHandler(asdict(config.database) if config.database else {})
 
     # Fetch trade logs and performance snapshots from the last day
     end_date = datetime.now()
@@ -69,7 +39,7 @@ def main():
     trade_logs = db_handler.get_trade_logs(start_date, end_date)
     performance_snapshots = db_handler.get_performance_snapshots(start_date, end_date)
 
-    analyzer = PerformanceAnalyzer(initial_capital=config["backtest"]["initial_cash"])
+    analyzer = PerformanceAnalyzer(initial_capital=config.backtest.initial_cash)
 
     # Populate analyzer with data fetched from the database
     for trade in trade_logs:
@@ -81,14 +51,13 @@ def main():
     report = analyzer.generate_performance_report()
 
     # Ensure the output directory exists
-    output_dir = config["paths"]["output_dir"]
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    output_dir = config.paths.output_dir
+    ensure_directory(output_dir)
 
     # Save the report to a file
     report_filename = f"daily_report_{datetime.now().strftime('%Y%m%d')}.json"
-    report_path = os.path.join(output_dir, report_filename)
-    with open(report_path, "w") as f:
+    report_path = output_dir / report_filename
+    with report_path.open("w", encoding="utf-8") as f:
         f.write(report)
 
     logging.info(f"Daily report generated at: {report_path}")

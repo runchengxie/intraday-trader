@@ -1,16 +1,16 @@
 import logging
 import os
 import sys
+from dataclasses import asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
 
+from patf_trading_framework.configuration import load_app_config
 from patf_trading_framework.data_utils import fetch_historical_data
 from patf_trading_framework.db_handler import DBHandler
-
-from .run_backtests import load_config
 
 # (Configure logging)
 logging.basicConfig(
@@ -32,20 +32,20 @@ def main():
     load_dotenv(dotenv_path=dotenv_path)
     logging.info(f"Loaded environment variables from: {dotenv_path}")
 
-    config = load_config(config_path)
+    config = load_app_config(config_path)
 
-    db_handler = DBHandler(config["database"])
+    db_handler = DBHandler(asdict(config.database) if config.database else {})
     db_handler.initialize_db()
 
     API_KEY = os.getenv("APCA_API_KEY_ID")
     SECRET_KEY = os.getenv("APCA_API_SECRET_KEY")
-    BASE_URL = os.getenv("ALPACA_BASE_URL")
+    BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
     api = REST(API_KEY, SECRET_KEY, base_url=BASE_URL)
 
     # --- Core Logic ---
     # Usually fetch data for yesterday
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    symbol = config["data"]["ticker"]  # Or receive from command line arguments
+    symbol = config.data.ticker  # Or receive from command line arguments
 
     logging.info(f"Fetching data for {symbol} for date: {yesterday}")
 
@@ -56,8 +56,9 @@ def main():
         timeframe=TimeFrame.Minute,  # Fetch minute data
         start_date=yesterday,
         end_date=yesterday,
-        cache_dir=config["paths"]["cache_dir"],
+        cache_dir=str(config.paths.cache_dir),
         db_handler=db_handler,
+        adjustment=config.data.adjustment,
     )
 
     logging.info("Market data update task finished.")

@@ -9,12 +9,14 @@ pd = pytest.importorskip("pandas")
 from dotenv import load_dotenv
 from sqlalchemy import inspect, text
 
+from dataclasses import asdict
+
+from patf_trading_framework.configuration import load_app_config
 from patf_trading_framework.db_handler import (
     DBHandler,
     PerformanceSnapshot,
     TradeLog,
 )
-from patf_trading_framework.scripts.run_backtests import load_config
 
 project_root = Path(__file__).resolve().parent.parent.parent
 
@@ -39,8 +41,8 @@ def db_handler():
         # --- Setup ---
         # Load config to get database connection details
         load_dotenv(dotenv_path=project_root / ".env")
-        config = load_config(project_root / "config.yml")
-        db_config = config["database"].copy()
+        config = load_app_config(project_root / "config.yml")
+        db_config = asdict(config.database) if config.database else {"backend": "sqlite"}
 
         if db_config.get("backend", "sqlite").lower() == "sqlite":
             tmp_db_path = project_root / "output" / "test_trading.db"

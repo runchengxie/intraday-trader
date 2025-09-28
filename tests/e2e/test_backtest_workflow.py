@@ -3,7 +3,7 @@ import pytest
 bt = pytest.importorskip("backtrader")
 pd = pytest.importorskip("pandas")
 
-from patf_trading_framework.scripts.run_backtests import run_backtest
+from patf_trading_framework.backtest.engine import BacktestRequest, run_backtest
 from patf_trading_framework.strategies import CustomRatioStrategy
 
 
@@ -22,13 +22,14 @@ def test_full_backtest_run_with_trades():
     params = {'long_ma_period': 50, 'sell_threshold': 1.02, 'exit_threshold': 1.0}
 
     cerebro, analysis_results = run_backtest(
-        strategy_cls=CustomRatioStrategy,
-        data_feed=data_feed,
-        initial_cash=100000,
-        commission=0.001,
-        single_run_params=params,
-        optimize=False,
-        strategy_name="FunctionalTestRatio"
+        BacktestRequest(
+            strategy_cls=CustomRatioStrategy,
+            data_feed=data_feed,
+            initial_cash=100000,
+            commission=0.001,
+            single_run_params=params,
+            strategy_name="FunctionalTestRatio",
+        )
     )
 
     assert analysis_results is not None

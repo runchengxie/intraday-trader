@@ -27,18 +27,18 @@ classifiers = [
 
 # Core dependencies: these are required to run the project.
 dependencies = [
-    "pandas>=1.5",
-    "numpy==1.26.4",
-    "pyyaml",
-    "matplotlib>=3.5",
-    "requests>=2.28",
-    "python-dotenv>=0.21",
-    "pyarrow>=11.0",
-    "websockets>=10.0",
-    "scipy>=1.8",
-    "alpaca-trade-api",
-    "backtrader",
-    "sqlalchemy>=2.0",
+    "pandas>=1.5,<3.0",
+    "numpy>=1.26,<2.1",
+    "pyyaml>=6.0,<7.0",
+    "matplotlib>=3.5,<4.0",
+    "requests>=2.28,<3.0",
+    "python-dotenv>=0.21,<2.0",
+    "pyarrow>=11.0,<18.0",
+    "websockets>=10.0,<12.0",
+    "scipy>=1.8,<2.0",
+    "alpaca-trade-api>=3.0,<5.0",
+    "backtrader>=1.9,<2.0",
+    "sqlalchemy>=2.0,<3.0",
 ]
 
 [project.optional-dependencies]

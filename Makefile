@@ -1,4 +1,4 @@
-.PHONY: help backtest update live dashboard lint docker-build docker-backtest docker-live docker-db
+.PHONY: help backtest update live dashboard lint fmt coverage docker-build docker-backtest docker-live docker-db
 
 UV ?= uv
 
@@ -16,25 +16,31 @@ help:
 	&& echo "  make docker-db      # Start TimescaleDB only"
 
 backtest:
-	patf run-backtest
+        patf backtest run
 
 update:
-	patf run-update-data
+        patf update-data
 
 live:
-	patf run-live
+        patf live
 
 dashboard:
-	patf run-dashboard
+        patf dashboard
 
 lint:
-	$(UV) run ruff check .
+        $(UV) run ruff check .
+
+fmt:
+        $(UV) run ruff format .
+
+coverage:
+        $(UV) run pytest --cov=patf_trading_framework --cov-report=term-missing
 
 docker-build:
 	docker compose build
 
 docker-backtest:
-	docker compose --profile live run --rm trading-bot patf run-backtest
+        docker compose --profile live run --rm trading-bot patf backtest run
 
 docker-live:
 	docker compose --profile live up trading-bot

@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
-# Mapping from CLI subcommands to the modules that expose a ``main`` function.
-_COMMAND_MODULES: dict[str, str] = {
-    "run-backtest": "patf_trading_framework.scripts.run_backtests",
-    "run-live": "patf_trading_framework.scripts.run_live_trading",
-    "run-update-data": "patf_trading_framework.scripts.run_update_data",
-    "run-generate-report": "patf_trading_framework.scripts.run_generate_report",
-    "run-dashboard": "patf_trading_framework.scripts.run_dashboard",
+_BACKTEST_COMMANDS = {
+    "run": "patf_trading_framework.scripts.run_backtests:run_command",
+    "optimise": "patf_trading_framework.scripts.run_backtests:optimise_command",
+    "optimize": "patf_trading_framework.scripts.run_backtests:optimise_command",
+    "benchmark": "patf_trading_framework.scripts.run_backtests:benchmark_command",
+}
+
+_SIMPLE_COMMANDS = {
+    "update-data": "patf_trading_framework.scripts.run_update_data:main",
+    "generate-report": "patf_trading_framework.scripts.run_generate_report:main",
+    "live": "patf_trading_framework.scripts.run_live_trading:main",
+    "dashboard": "patf_trading_framework.scripts.run_dashboard:main",
 }
 
 
@@ -21,43 +25,16 @@ class CommandNotFoundError(RuntimeError):
     """Raised when a user invokes an unknown PATF subcommand."""
 
 
-def _load_command(command: str) -> Callable[[], int | None]:
-    """Return the ``main`` callable for a given subcommand.
-
-    Parameters
-    ----------
-    command:
-        The subcommand requested by the user, e.g. ``"run-backtest"``.
-
-    Returns
-    -------
-    Callable
-        The zero-argument ``main`` function associated with the command.
-
-    Raises
-    ------
-    CommandNotFoundError
-        If there is no module registered for ``command``.
-    AttributeError
-        If the target module does not expose a ``main`` function.
-    """
-
-    module_path = _COMMAND_MODULES.get(command)
-    if module_path is None:
-        raise CommandNotFoundError(f"Unknown command: {command}")
-
-    module = importlib.import_module(module_path)
-    main_callable = getattr(module, "main")
-    if not callable(main_callable):
-        raise AttributeError(
-            f"Module '{module_path}' does not define a callable 'main' function."
-        )
-    return main_callable
+def _load_callable(path: str) -> Callable[[Sequence[str] | None], int | None]:
+    module_name, func_name = path.split(":", 1)
+    module = importlib.import_module(module_name)
+    func = getattr(module, func_name)
+    if not callable(func):  # pragma: no cover - defensive path
+        raise AttributeError(f"{path} is not callable")
+    return func
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Construct the top-level argument parser for the CLI."""
-
     parser = argparse.ArgumentParser(
         prog="patf",
         description=(
@@ -65,54 +42,42 @@ def _build_parser() -> argparse.ArgumentParser:
             "Use one of the available subcommands to interact with the framework."
         ),
     )
-    parser.add_argument(
-        "command",
-        nargs="?",
-        choices=sorted(_COMMAND_MODULES),
-        help="The PATF subcommand to execute.",
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    backtest_parser = subparsers.add_parser(
+        "backtest",
+        help="Run backtest workflows (run/optimise/benchmark)",
     )
-    parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-        help=(
-            "Additional arguments passed through to the selected subcommand. "
-            "These mirror the parameters supported by the underlying script."
-        ),
-    )
+    backtest_subparsers = backtest_parser.add_subparsers(dest="backtest_command")
+
+    for name, target in _BACKTEST_COMMANDS.items():
+        sub = backtest_subparsers.add_parser(name, add_help=False)
+        sub.add_argument("args", nargs=argparse.REMAINDER)
+        sub.set_defaults(target=target)
+
+    for name, target in _SIMPLE_COMMANDS.items():
+        simple = subparsers.add_parser(name, add_help=False)
+        simple.add_argument("args", nargs=argparse.REMAINDER)
+        simple.set_defaults(target=target)
+
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point for the ``patf`` console script."""
-
+def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     parsed = parser.parse_args(argv)
 
-    if parsed.command is None:
+    target_path = getattr(parsed, "target", None)
+    if target_path is None:
         parser.print_help()
         return 0
 
-    try:
-        command_main = _load_command(parsed.command)
-    except CommandNotFoundError as exc:
-        parser.error(str(exc))
-    except AttributeError as exc:
-        parser.error(str(exc))
-
-    # Preserve the original sys.argv so that subcommands that rely on
-    # ``argparse`` or other CLI parsing work exactly as if they were invoked
-    # directly. We scope the new argv to the lifecycle of the subcommand.
-    original_argv = sys.argv
-    sys.argv = [parsed.command, *parsed.args]
-    try:
-        result = command_main()
-    finally:
-        sys.argv = original_argv
-
-    # Normalise ``None`` to ``0`` so that console scripts have a deterministic
-    # exit status when the subcommand does not explicitly return anything.
+    target = _load_callable(target_path)
+    args = getattr(parsed, "args", [])
+    result = target(args)
     return 0 if result is None else int(result)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
