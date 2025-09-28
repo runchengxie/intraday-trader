@@ -12,7 +12,7 @@ data:
   timeframe_unit: "Minute" # 'Minute', 'Hour', 'Day'
   start_date: "2023-01-01"
   end_date: "2023-06-30" # Extended 6-month period for meaningful back-testing
-  resample_freq_template: '{timeframe_value}min'
+  adjustment: "split" # Options: raw, split, dividend, all
 
 # --- File and Directory Paths ---
 paths:
@@ -27,6 +27,7 @@ benchmark:
   type: "buy_and_hold"
   size_pct: 1.0
   name: "Buy & Hold"
+  total_return: true
 
 # --- Database Configuration ---
 # By default we keep things simple and store data in a local SQLite file.

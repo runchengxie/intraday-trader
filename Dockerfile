@@ -29,6 +29,9 @@ ENV PYTHONPATH /app
 # Install uv in the runner stage as well
 RUN pip install uv
 
+# Create an unprivileged user for runtime
+RUN useradd --create-home --shell /bin/bash trader
+
 # Copy the built wheel from the builder stage
 COPY --from=builder /app/dist /wheels/
 
@@ -45,5 +48,14 @@ RUN uv pip install --system /wheels/*.whl
 # Grant execute permissions to the scripts if needed (good practice)
 RUN chmod +x /app/scripts/*.py
 
+# Ensure runtime directories are writable by the non-root user
+RUN chown -R trader:trader /app
+
+USER trader
+
+# Simple healthcheck to ensure the CLI is callable
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import patf_trading_framework" || exit 1
+
 # Set the default command to run when the container starts.
-CMD ["run-live"]
+CMD ["patf", "live"]

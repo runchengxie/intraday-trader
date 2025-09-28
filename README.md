@@ -10,7 +10,7 @@
 - **输出挂载与 .dockerignore**：容器默认把 `./output` 映射到 `/app/output`，配合 `.dockerignore` 隔离本地缓存与敏感文件，便于落地部署。
 
 ### 可安装的 CLI 与脚本分发
-- `pyproject.toml` 声明 `patf` 顶层命令与 `run-backtest`、`run-live` 等 5 个脚本入口，安装后可以直接在任何环境调用。 
+- `pyproject.toml` 声明 `patf` 顶层命令，并在其下挂载 `backtest run/optimise/benchmark`、`update-data`、`live` 等子命令，安装后即可在任意环境调用。
 - `src/patf_trading_framework/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
 
 ### 数据持久化与配置解耦
@@ -50,7 +50,7 @@ flowchart LR
 
     subgraph Backtest_and_Analytics["回测与分析"]
         direction TB
-        BacktestScript[run-backtest]
+        BacktestScript[patf backtest]
         ReportScript[run-generate-report]
         DashboardScript[run-dashboard]
         Data_Utils[data_utils.py]
@@ -131,11 +131,13 @@ flowchart LR
    export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
    ```
 4. **运行命令行工具**
-   - 更新行情数据：`patf run-update-data`
-   - 回测策略：`patf run-backtest`
-   - 生成报表：`patf run-generate-report`
-   - 启动纸上交易：`patf run-live`
-   - 启动仪表盘：`patf run-dashboard`
+   - 更新行情数据：`patf update-data`
+   - 回测策略：`patf backtest run`
+   - 参数优化：`patf backtest optimise`
+   - 基准对比：`patf backtest benchmark`
+   - 生成报表：`patf generate-report`
+   - 启动纸上交易：`patf live`
+   - 启动仪表盘：`patf dashboard`
 
    若需仪表盘，安装时请带上 `dashboard` 可选依赖：
 
@@ -150,6 +152,8 @@ flowchart LR
 make help           # 查看所有常用命令
 make backtest       # 本地回测
 make update         # 更新数据缓存
+make fmt            # 使用 Ruff Formatter 自动格式化
+make coverage       # 运行 pytest 并输出覆盖率
 make docker-live    # 容器模式启动交易服务 + DB
 make docker-db      # 仅启动 TimescaleDB（容器）
 ```
@@ -158,18 +162,22 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 | 命令 | 目标 | 关键操作 | 主要产出 |
 | --- | --- | --- | --- |
-| `run-update-data` | 获取最新行情并写入缓存/数据库 | 读取 `.env` 中的 Alpaca 密钥，调用 `fetch_historical_data` 并通过 `DBHandler` 写入 TimescaleDB/SQLite | `output/cache/` 下的 Parquet/SQLite 刷新；数据库 K 线数据 |
-| `run-backtest` | 运行单次回测或参数优化 | 初始化日志目录、载入策略、可选并行优化，生成图表/日志并可写入数据库 | `output/logs/trading_log_*.log`、`output/charts/*.png`、控制台指标汇总 |
-| `run-generate-report` | 汇总交易日志与绩效快照生成日报 | 从数据库提取 24 小时交易与绩效数据，调用 `PerformanceAnalyzer` 输出报告 | `output/daily_report_YYYYMMDD.json` |
-| `run-live` | 启动纸上交易执行引擎 | 初始化 `EnhancedTradingSystem`、订阅 Alpaca WebSocket、前置风险检查、异步处理订单 | `output/logs/` 中的实时日志、数据库中的交易/绩效快照 |
-| `run-dashboard` | 启动 Streamlit 仪表盘 | 调用 `streamlit run dashboard_app.py` 并监听本地端口 | Web UI（默认 http://localhost:8501） |
+| `update-data` | 获取最新行情并写入缓存/数据库 | 读取 `.env` 中的 Alpaca 密钥，调用 `fetch_historical_data` 并通过 `DBHandler` 写入 TimescaleDB/SQLite | `output/cache/` 下的 Parquet/SQLite 刷新；数据库 K 线数据 |
+| `backtest run` | 运行单次回测 | 初始化日志目录、载入策略，生成图表/日志并可写入数据库 | `output/logs/trading_log_*.log`、`output/charts/*.png`、控制台指标汇总 |
+| `backtest optimise` | 执行参数优化 | 结合 `strategies.*.opt_ranges` 并行搜索参数组合，输出前十结果 | 控制台排名输出、日志记录 |
+| `backtest benchmark` | 仅运行基准 | 运行配置中的基准策略，可选计算含分红总回报 | 基准指标与图表 |
+| `generate-report` | 汇总交易日志与绩效快照生成日报 | 从数据库提取 24 小时交易与绩效数据，调用 `PerformanceAnalyzer` 输出报告 | `output/daily_report_YYYYMMDD.json` |
+| `live` | 启动纸上交易执行引擎 | 初始化 `EnhancedTradingSystem`、订阅 Alpaca WebSocket、前置风险检查、异步处理订单 | `output/logs/` 中的实时日志、数据库中的交易/绩效快照 |
+| `dashboard` | 启动 Streamlit 仪表盘 | 调用 `streamlit run dashboard_app.py` 并监听本地端口 | Web UI（默认 http://localhost:8501） |
 
 ### 命令详解
-- **run-update-data**：脚本会先加载 `.env`，然后根据 `config.yml` 中的 `data.ticker` 与时间范围决定拉取的标的与窗口，支持向缓存目录写入 Parquet 文件并通过 `DBHandler.initialize_db()` 创建所需表结构。
-- **run-backtest**：除策略回测外，还会根据 `config.yml.paths` 自动创建日志、图表、缓存目录，并把运行日志写入 `output/logs/trading_log_*.log`；在开启优化时尊重 `max_cpus` 设定。
-- **run-generate-report**：默认取最近 24 小时的交易与绩效快照，借助 `PerformanceAnalyzer.generate_performance_report()` 生成 JSON 文档，便于上游任务继续处理或推送。
-- **run-live**：`EnhancedTradingSystem` 内部组合了 `RiskManager`、`PerformanceAnalyzer`、`ConsistencyValidator` 与 `BrokerAPIHandler`，所有订单在入队前都会通过风险检查；同时支持 `no_fill_test_mode` 进行“不会成交”的联调演练。
-- **run-dashboard**：如果仓库安装了 `dashboard` 可选依赖，会启动 Streamlit 应用，实时展示数据库中的账户表现与风险指标。
+- **update-data**：脚本会先加载 `.env`，然后根据 `config.yml` 中的 `data.ticker` 与时间范围决定拉取的标的与窗口，支持向缓存目录写入 Parquet 文件并通过 `DBHandler.initialize_db()` 创建所需表结构。
+- **backtest run**：除策略回测外，会根据 `config.yml.paths` 自动创建日志、图表、缓存目录，并把运行日志写入 `output/logs/trading_log_*.log`。若配置基准并启用 `benchmark.total_return`，会自动汇总股息到总回报指标。
+- **backtest optimise**：尊重 `backtest.max_cpus` 并行执行参数搜索，输出 `Final Value`、`Sharpe Ratio` 等指标的前十名列表。
+- **backtest benchmark**：只运行基准策略，适合在 CI 中做快速健诊，也可以单独查看含分红/不含分红的收益差异。
+- **generate-report**：默认取最近 24 小时的交易与绩效快照，借助 `PerformanceAnalyzer.generate_performance_report()` 生成 JSON 文档，便于上游任务继续处理或推送。
+- **live**：`EnhancedTradingSystem` 内部组合了 `RiskManager`、`PerformanceAnalyzer`、`ConsistencyValidator` 与 `BrokerAPIHandler`，所有订单在入队前都会通过风险检查；同时支持 `no_fill_test_mode` 进行“不会成交”的联调演练。
+- **dashboard**：如果仓库安装了 `dashboard` 可选依赖，会启动 Streamlit 应用，实时展示数据库中的账户表现与风险指标。
 
 ## 配置、环境与密钥管理
 
@@ -207,9 +215,9 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 | 任务 | 推荐频率 | 命令 | 备注 |
 | --- | --- | --- | --- |
-| 行情更新 | 每日开盘前 | `patf run-update-data` | 需要 Alpaca API 密钥与数据库连接 |
-| 回测回归 | 每周或策略改动时 | `patf run-backtest --args ...` | 可结合参数优化输出对比图表 |
-| 日报生成 | 每日收盘后 | `patf run-generate-report` | 产出 JSON，可再由 CI 推送到 S3/钉钉等 |
+| 行情更新 | 每日开盘前 | `patf update-data` | 需要 Alpaca API 密钥与数据库连接 |
+| 回测回归 | 每周或策略改动时 | `patf backtest run` / `patf backtest optimise` | 可结合参数优化输出对比图表 |
+| 日报生成 | 每日收盘后 | `patf generate-report` | 产出 JSON，可再由 CI 推送到 S3/钉钉等 |
 
 若在 GitHub Actions 部署，请记得在仓库 Secrets 中配置 Alpaca 凭证与数据库密码。
 
@@ -217,7 +225,7 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 - **成交模型待加强**：当前冲击成本为静态系数，后续计划引入基于订单簿深度的动态模型。 
 - **执行算法有限**：实盘仅提供均值回归策略，后续会补充 VWAP/TWAP 等算法。 
-- **回测逼真度**：尚未覆盖交易所费用、断路器、撮合延迟等细节，需要进一步模拟。 
+- **回测逼真度**：仍待模拟交易所费用、断路器、撮合延迟等细节；当前版本已支持基准含分红收益与 `max_cpus` 自适应，但真实成交建模仍有提升空间。
 - **策略扩展**：虽有策略注册表，但缺少模板与文档指导多标的、多频率策略的接入。 
 - **回放测试**：目前无历史行情回放的集成测试场景，建议未来补充。
 

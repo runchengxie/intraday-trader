@@ -55,10 +55,19 @@ def get_last_trading_day(api_instance, target_date_str):
         return None
 
 
-def _build_cache_path(cache_dir: str, symbol: str, timeframe, start_date: str, end_date: str) -> str:
+def _build_cache_path(
+    cache_dir: str,
+    symbol: str,
+    timeframe,
+    start_date: str,
+    end_date: str,
+    adjustment: str,
+) -> str:
     os.makedirs(cache_dir, exist_ok=True)
     timeframe_str = str(timeframe).replace("TimeFrame.", "")
-    cache_filename = f"{symbol}_{timeframe_str}_{start_date}_{end_date}.parquet"
+    cache_filename = (
+        f"{symbol}_{timeframe_str}_{adjustment}_{start_date}_{end_date}.parquet"
+    )
     return os.path.join(cache_dir, cache_filename)
 
 
@@ -125,6 +134,7 @@ def _fetch_from_api(
     timeframe,
     start_date: str,
     end_date: str,
+    adjustment: str,
 ) -> pd.DataFrame | None:
     try:
         logger.info(
@@ -148,7 +158,11 @@ def _fetch_from_api(
         )
 
         bars = api.get_bars(
-            symbol, timeframe, start=start_dt_iso, end=end_dt_iso, adjustment="raw"
+            symbol,
+            timeframe,
+            start=start_dt_iso,
+            end=end_dt_iso,
+            adjustment=adjustment,
         ).df
         return bars if bars is not None else None
     except Exception as exc:
@@ -172,13 +186,16 @@ def fetch_historical_data(
     end_date,
     cache_dir: str,
     db_handler: DBHandler = None,
+    adjustment: str = "raw",
 ):
     """
     Fetches historical bar data, using the database as the primary cache.
     Falls back to the Alpaca API if data is not in the database.
     """
 
-    cache_filepath = _build_cache_path(cache_dir, symbol, timeframe, start_date, end_date)
+    cache_filepath = _build_cache_path(
+        cache_dir, symbol, timeframe, start_date, end_date, adjustment
+    )
 
     data_source = "database"
     bars = _load_from_db(db_handler, symbol, start_date, end_date)
@@ -189,7 +206,9 @@ def fetch_historical_data(
 
     if bars is None:
         data_source = "api"
-        bars = _fetch_from_api(api, symbol, timeframe, start_date, end_date)
+        bars = _fetch_from_api(
+            api, symbol, timeframe, start_date, end_date, adjustment=adjustment
+        )
 
     if bars is None or getattr(bars, "empty", False):
         logger.warning("No data retrieved for %s from any source.", symbol)

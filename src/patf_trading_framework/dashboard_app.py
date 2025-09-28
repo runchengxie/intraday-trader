@@ -1,4 +1,5 @@
 import sys
+from dataclasses import asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -9,10 +10,10 @@ from dotenv import load_dotenv
 # Ensures that other project modules can be found by Streamlit
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
+from patf_trading_framework.configuration import load_app_config
 from patf_trading_framework.db_handler import DBHandler
 from patf_trading_framework.performance_analyzer import PerformanceAnalyzer
 from patf_trading_framework.risk_manager import RiskManager
-from patf_trading_framework.scripts.run_backtests import load_config
 
 # --- Main Application Logic ---
 st.set_page_config(layout="wide", page_title="Trading Performance Dashboard")
@@ -24,8 +25,8 @@ load_dotenv()
 
 # --- Load config and initialize ---
 try:
-    config = load_config("config.yml")
-    db_handler = DBHandler(config["database"])
+    config = load_app_config(Path("config.yml"))
+    db_handler = DBHandler(asdict(config.database) if config.database else {})
     db_handler.initialize_db()
 except Exception as e:
     st.error(f"Failed to initialize application: {e}")
@@ -54,7 +55,7 @@ if perf_snapshots.empty:
     st.warning("No performance snapshots found for the selected period.")
 else:
     # --- Calculate metrics using PerformanceAnalyzer ---
-    initial_capital = config.get("backtest", {}).get("initial_cash", 100000)
+    initial_capital = config.backtest.initial_cash
     analyzer = PerformanceAnalyzer(initial_capital)
     risk_manager = RiskManager()
 
