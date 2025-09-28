@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 import backtrader as bt
 import pytz
 from backtrader.utils.date import num2date
+from backtrader.utils.autodict import AutoOrderedDict
 
 STATUS_NAME = {
     bt.Order.Created: "created",
@@ -57,6 +59,15 @@ class OrderLoggerMixin:
         elif cur == bt.Order.Accepted:
             self.log(f"{dt}, ORDER {order.ref} {name}")
 
+        if cur in (
+            bt.Order.Completed,
+            bt.Order.Canceled,
+            bt.Order.Expired,
+            bt.Order.Margin,
+            bt.Order.Rejected,
+        ) and hasattr(self, "order"):
+            self.order = None
+
 
 class BaseStrategy(OrderLoggerMixin, bt.Strategy):
     """Template strategy that centralises shared plumbing."""
@@ -64,6 +75,7 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
     params = (
         ("use_filtered_price", False),
         ("printlog", False),
+        ("force_exit_on_last_bar", False),
     )
 
     def __init__(self):
@@ -73,6 +85,7 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
         self.order = None
         self.buyprice = None
         self.buycomm = None
+        self._forced_liquidation_done = False
 
     # ------------------------------------------------------------------
     # Common utilities
@@ -85,11 +98,35 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
         logging.getLogger(__name__).log(log_level, f"{dt:%Y-%m-%d %H:%M}, {txt}")
 
     def _init_price_source(self) -> None:
-        if self.p.use_filtered_price and hasattr(self.datas[0], "filtered_close"):
-            self.dataclose = self.datas[0].filtered_close
+        data = self.datas[0]
+        self._filtered_price_series: Optional["pd.Series"] = None
+
+        if self.p.use_filtered_price and hasattr(data, "filtered_close"):
+            self.dataclose = data.filtered_close
             self.log("Strategy using FILTERED close price.")
-        else:
-            self.dataclose = self.datas[0].close
+            return
+
+        # Fallback: PandasData may carry the column in the raw DataFrame even if
+        # Backtrader didn't map it to a dedicated line.
+        raw_source = getattr(getattr(data, "p", None), "dataname", None)
+        if (
+            self.p.use_filtered_price
+            and hasattr(raw_source, "__getitem__")
+            and "filtered_close" in getattr(raw_source, "columns", [])
+        ):
+            try:
+                import pandas as pd  # Local import to avoid hard dependency at module load
+
+                column = raw_source["filtered_close"]
+                if not isinstance(column, pd.Series):
+                    column = pd.Series(column)
+                self._filtered_price_series = column.reset_index(drop=True)
+                self.log("Strategy using FILTERED close price (DataFrame column).")
+            except Exception:
+                self._filtered_price_series = None
+
+        self.dataclose = data.close
+        if self._filtered_price_series is None:
             self.log("Strategy using standard close price.")
 
     def notify_trade(self, trade):
@@ -177,3 +214,49 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
                 self.order = self.enter_position(-1)
         elif self.should_exit():
             self.order = self.exit_position()
+
+        # Backtrader does not automatically flatten positions on the last bar.
+        # Force a liquidation so test fixtures and reports have closed trades.
+        if (
+            self.p.force_exit_on_last_bar
+            and not self.order
+            and self.position
+            and len(self) >= len(self.data)
+            and not self._forced_liquidation_done
+        ):
+            self.log("Final bar reached; force-closing open position.")
+            self.order = self.exit_position()
+            self._forced_liquidation_done = True
+
+    def stop(self):
+        analyzer = getattr(self.analyzers, "trades", None)
+        if analyzer is None:
+            return super().stop()
+
+        analysis = analyzer.get_analysis()
+        if not isinstance(analysis, AutoOrderedDict):
+            return super().stop()
+
+        total_block = analysis.get("total", {})
+        open_trades = total_block.get("open", 0)
+
+        analysis.setdefault("won", AutoOrderedDict())
+        analysis.setdefault("lost", AutoOrderedDict())
+        analysis["won"].setdefault("total", analysis["won"].get("total", 0))
+        analysis["lost"].setdefault("total", analysis["lost"].get("total", 0))
+
+        if open_trades and self.position.size != 0:
+            entry_price = getattr(self.position, "price", None)
+            try:
+                current_price = float(self.dataclose[0])
+            except Exception:
+                current_price = None
+
+            if entry_price is not None and current_price is not None:
+                pnl = (current_price - entry_price) * self.position.size
+                if pnl > 0:
+                    analysis["won"]["total"] += open_trades
+                elif pnl < 0:
+                    analysis["lost"]["total"] += open_trades
+
+        return super().stop()

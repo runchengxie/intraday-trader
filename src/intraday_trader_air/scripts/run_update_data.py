@@ -9,6 +9,11 @@ from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
 
 from intraday_trader_air.configuration import load_app_config
+from intraday_trader_air.data_quality import (
+    build_expected_frequency,
+    run_quality_checks,
+    write_quality_report,
+)
 from intraday_trader_air.data_utils import fetch_historical_data
 from intraday_trader_air.db_handler import DBHandler
 
@@ -50,7 +55,7 @@ def main():
     logging.info(f"Fetching data for {symbol} for date: {yesterday}")
 
     # fetch_historical_data already includes logic to write to the database
-    fetch_historical_data(
+    bars = fetch_historical_data(
         api=api,
         symbol=symbol,
         timeframe=TimeFrame.Minute,  # Fetch minute data
@@ -60,6 +65,24 @@ def main():
         db_handler=db_handler,
         adjustment=config.data.adjustment,
     )
+
+    if bars is None or bars.empty:
+        logging.warning("No bars returned; skipping data quality checks")
+        return
+
+    expected_freq = build_expected_frequency(
+        config.data.timeframe_value, config.data.timeframe_unit
+    )
+    report = run_quality_checks(bars, expected_freq, symbol)
+    report_path = write_quality_report(report, config.paths.output_dir)
+    if report.get("warnings"):
+        logging.warning(
+            "Data quality warnings detected for %s. See %s for details.",
+            symbol,
+            report_path,
+        )
+    else:
+        logging.info("Data quality checks passed for %s", symbol)
 
     logging.info("Market data update task finished.")
 

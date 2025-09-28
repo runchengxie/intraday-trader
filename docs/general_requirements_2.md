@@ -1,5 +1,7 @@
 # Final Project Brief
 
+> **课堂参考**：本简报保留课堂背景信息，与当前仓库的实际开发流程并无直接绑定，请以 README 与贡献指南为准。
+
 Kannan Singaravelu, CQF
 
 ---

@@ -218,8 +218,9 @@ class RiskManager:
                     f"Order rejected: Participation ratio {participation_ratio:.2%} exceeds limit of {max_participation_ratio:.2%}."
                 )
         else:
-            passed = False
-            details["warnings"].append("Order rejected: No reliable recent average volume available.")
+            details["warnings"].append(
+                "No reliable recent average volume available; skipping participation check."
+            )
 
         if bid_ask_spread_pct is not None:
             max_spread = self.config.get("max_bid_ask_spread_pct", 0.005)
@@ -264,7 +265,7 @@ class RiskManager:
         proposed_trade_value: float,
         portfolio_value: float,
         gross_position_value: float,
-        cash: float,
+        cash: float | None,
     ) -> tuple[bool, list[str]]:
         """
         Pre-trade check for leverage and exposure limits.
@@ -300,9 +301,11 @@ class RiskManager:
             )
 
         # 2. Buying Power / Cash (warning-level)
-        if proposed_trade_value > cash:
+        cash_balance = cash if cash is not None else portfolio_value
+
+        if proposed_trade_value > cash_balance:
             warnings.append(
-                f"Trade value ${proposed_trade_value:,.2f} may exceed cash ${cash:,.2f}."
+                f"Trade value ${proposed_trade_value:,.2f} may exceed cash ${cash_balance:,.2f}."
             )
 
         if not passed:

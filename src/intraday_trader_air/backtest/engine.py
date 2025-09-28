@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from statistics import fmean
 from dataclasses import dataclass
 from typing import Any, Mapping
 
 import backtrader as bt
+import numpy as np
 
 from intraday_trader_air.backtest_utils import analyze_optimization_results
 from intraday_trader_air.exception_handler import ExceptionHandler
@@ -72,6 +74,10 @@ def run_backtest(request: BacktestRequest) -> tuple[bt.Cerebro, dict[str, Any]] 
     )
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name="drawdown")
     cerebro.addanalyzer(bt.analyzers.Returns, _name="returns")
+    cerebro.addanalyzer(
+        bt.analyzers.TimeReturn, _name="timereturn", timeframe=bt.TimeFrame.Days
+    )
+    cerebro.addanalyzer(bt.analyzers.Transactions, _name="transactions")
 
     if request.optimize:
         if not opt_param_values:
@@ -107,6 +113,28 @@ def run_backtest(request: BacktestRequest) -> tuple[bt.Cerebro, dict[str, Any]] 
     sharpe_ratio = strat.analyzers.sharpe.get_analysis()
     drawdown = strat.analyzers.drawdown.get_analysis()
     returns = strat.analyzers.returns.get_analysis()
+    timereturns = strat.analyzers.timereturn.get_analysis()
+    transactions = strat.analyzers.transactions.get_analysis()
+
+    return_values = np.array(list(timereturns.values()), dtype=float)
+    var_95 = float(np.percentile(return_values, 5)) if return_values.size else float("nan")
+    if return_values.size:
+        cvar_mask = return_values <= var_95
+        cvar_95 = float(return_values[cvar_mask].mean()) if cvar_mask.any() else float("nan")
+    else:
+        cvar_95 = float("nan")
+
+    total_traded_value = 0.0
+    for trade_list in transactions.values():
+        for trade in trade_list:
+            size = trade[0]
+            price = trade[1]
+            total_traded_value += abs(size * price)
+
+    avg_portfolio_value = fmean([request.initial_cash, cerebro.broker.getvalue()])
+    turnover_ratio = (
+        total_traded_value / avg_portfolio_value if avg_portfolio_value > 0 else float("nan")
+    )
 
     analysis_results = {
         "Final Value": cerebro.broker.getvalue(),
@@ -126,5 +154,8 @@ def run_backtest(request: BacktestRequest) -> tuple[bt.Cerebro, dict[str, Any]] 
         "Sharpe Ratio": sharpe_ratio.get("sharperatio", "N/A"),
         "Max Drawdown (%)": drawdown.get("max", {}).get("drawdown", "N/A"),
         "Annualized Return (%)": returns.get("rnorm100", "N/A"),
+        "Value at Risk (95%) (%)": var_95 * 100 if np.isfinite(var_95) else "N/A",
+        "Conditional VaR (95%) (%)": cvar_95 * 100 if np.isfinite(cvar_95) else "N/A",
+        "Turnover (%)": turnover_ratio * 100 if np.isfinite(turnover_ratio) else "N/A",
     }
     return cerebro, analysis_results

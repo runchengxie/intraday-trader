@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterator
 
 import pytest
+import unittest.mock as mock
 
 from intraday_trader_air.configuration import AppConfig, load_app_config
 
@@ -73,4 +74,51 @@ def alpaca_stub() -> Iterator[object]:
             )
 
     yield _Stub()
+
+
+@pytest.fixture
+def mocker():
+    """Lightweight substitute for ``pytest-mock``'s fixture."""
+
+    active_patchers: list[object] = []
+
+    class _PatchProxy:
+        def __init__(self, outer: "_Mocker") -> None:
+            self._outer = outer
+
+        def __call__(self, target, *args, **kwargs):
+            return self._outer._patch(target, *args, **kwargs)
+
+        def object(self, target, attribute, *args, **kwargs):
+            return self._outer.patch_object(target, attribute, *args, **kwargs)
+
+    class _Mocker:
+        MagicMock = mock.MagicMock
+
+        def __init__(self) -> None:
+            self.patch = _PatchProxy(self)
+
+        def _patch(self, target, *args, **kwargs):
+            patcher = mock.patch(target, *args, **kwargs)
+            mocked = patcher.start()
+            active_patchers.append(patcher)
+            return mocked
+
+        def patch_object(self, target, attribute, *args, **kwargs):
+            patcher = mock.patch.object(target, attribute, *args, **kwargs)
+            mocked = patcher.start()
+            active_patchers.append(patcher)
+            return mocked
+
+        def spy(self, obj, attribute):
+            patcher = mock.patch.object(obj, attribute, wraps=getattr(obj, attribute))
+            spy_obj = patcher.start()
+            active_patchers.append(patcher)
+            return spy_obj
+
+    try:
+        yield _Mocker()
+    finally:
+        while active_patchers:
+            active_patchers.pop().stop()
 

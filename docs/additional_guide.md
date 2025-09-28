@@ -1,5 +1,7 @@
 # Algorithmic Trading for Reversion and Trend-Following
 
+> **课堂参考**：此指南保留课堂作业中的补充说明，当前仓库采纳部分思路，但具体执行细节以最新代码与文档为准。
+
 ## Introduction
 
 Part I. Implement at least (a) one mean-reversion strategy with a specific indicator of your choice AND (b) one trend-following strategy with several indicators of your choice. Rule-based strategy code to produce P&L plot.

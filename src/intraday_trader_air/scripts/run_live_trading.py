@@ -96,6 +96,118 @@ class EnhancedTradingSystem:
         except Exception as e:
             logger.error(f"[NO-FILL-TEST] Error auto-canceling order {order_id}: {e}")
 
+    async def _post_order_reconciliation(
+        self,
+        order_id: str,
+        *,
+        baseline_cash: float | None,
+        baseline_position: float,
+        side: str,
+        reference_price: float,
+        is_test_mode: bool,
+    ):
+        """Run a focused reconciliation cycle shortly after submitting an order."""
+
+        await asyncio.sleep(2)  # give the broker stream a moment to respond
+
+        try:
+            order_info = await asyncio.to_thread(
+                self.broker_handler.get_order_status, order_id
+            )
+            account_info = await asyncio.to_thread(
+                self.broker_handler.get_account_info
+            )
+            position_info = await asyncio.to_thread(
+                self.broker_handler.get_position, self.trading_state.symbol
+            )
+        except Exception as exc:  # pragma: no cover - network paths are hard to mock
+            logger.error(
+                f"[RECONCILE] Failed to pull reconciliation snapshots for order {order_id}: {exc}"
+            )
+            return
+
+        filled_qty = float(getattr(order_info, "filled_qty", 0.0)) if order_info else 0.0
+        order_status = getattr(order_info, "status", "unknown") if order_info else "missing"
+        account_cash = (
+            float(getattr(account_info, "cash", baseline_cash or 0.0))
+            if account_info
+            else baseline_cash
+        )
+        position_qty = (
+            float(getattr(position_info, "qty", baseline_position))
+            if position_info
+            else baseline_position
+        )
+
+        logger.info(
+            f"[RECONCILE] Post-order snapshot for {order_id}: status={order_status}, filled={filled_qty}, "
+            f"cash={account_cash}, position={position_qty}"
+        )
+
+        tolerance = 0.01
+        cash_delta = (
+            abs((baseline_cash or 0.0) - account_cash)
+            if baseline_cash is not None and account_cash is not None
+            else 0.0
+        )
+        position_delta = abs(position_qty - baseline_position)
+
+        if is_test_mode:
+            if filled_qty > 0 or cash_delta > tolerance or position_delta > tolerance:
+                logger.warning(
+                    "[NO-FILL-TEST] Unexpected state change detected after test order %s (cash Δ=%s, position Δ=%s, filled=%s)",
+                    order_id,
+                    f"{cash_delta:.2f}" if cash_delta is not None else "n/a",
+                    f"{position_delta:.2f}",
+                    filled_qty,
+                )
+            else:
+                logger.info(
+                    f"[NO-FILL-TEST] Reconciliation confirmed no state change for test order {order_id}."
+                )
+
+        if filled_qty > 0 and position_delta < tolerance:
+            logger.warning(
+                "[RECONCILE] Partial fill reported for %s but position unchanged; triggering consistency validator.",
+                order_id,
+            )
+            synthetic_backtest = {
+                "trades": [
+                    {
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "symbol": self.trading_state.symbol,
+                        "side": side.lower(),
+                        "quantity": 0.0,
+                        "price": reference_price,
+                    }
+                ]
+            }
+            synthetic_live = {
+                "trades": [
+                    {
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "symbol": self.trading_state.symbol,
+                        "side": side.lower(),
+                        "quantity": filled_qty,
+                        "price": reference_price,
+                    }
+                ]
+            }
+
+            results = self.consistency_validator.validate_consistency(
+                synthetic_backtest,
+                synthetic_live,
+                test_names=["ExecutionConsistencyTest"],
+            )
+
+            exec_result = results.get("ExecutionConsistencyTest")
+            if exec_result and exec_result.warnings:
+                for warning in exec_result.warnings:
+                    logger.warning(
+                        f"[RECONCILE] Consistency validator warning for {order_id}: {warning}"
+                    )
+
+
     async def _monitor_performance(self):
         """Periodically monitor and log performance"""
         while True:
@@ -332,6 +444,9 @@ class EnhancedTradingSystem:
         no_fill_config = self.app_config.get('live_trading', {}).get('no_fill_test_mode', {})
         is_test_mode = no_fill_config.get('enabled', False)
 
+        baseline_cash = self.trading_state.last_known_cash
+        baseline_position = self.trading_state.current_position_qty
+
         strategy_name = "mean_reversion" # dynamically get the currently running strategy
         strategy_config = self.app_config['strategies'][strategy_name]
         order_settings = strategy_config.get('order_settings', {})
@@ -407,6 +522,24 @@ class EnhancedTradingSystem:
                 logger.info(f"Order placed successfully: {order_result.id}")
 
             self.trading_state.set_active_order(order_result.id, order_result.client_order_id)
+
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    self._post_order_reconciliation(
+                        order_result.id,
+                        baseline_cash=baseline_cash,
+                        baseline_position=baseline_position,
+                        side=order_params.get('side', 'buy'),
+                        reference_price=current_price,
+                        is_test_mode=is_test_mode,
+                    )
+                )
+            except RuntimeError:
+                logger.debug(
+                    "Event loop not running; skipping post-order reconciliation task for %s",
+                    order_result.id,
+                )
         else:
             logger.error(f"Failed to place order with params: {order_params}")
 
@@ -660,8 +793,13 @@ class EnhancedTradingSystem:
                 signal = None
                 if data_type in ["trade", "bar"]:
                     current_price = self.trading_state.last_trade_price
+                    if not current_price:
+                        current_price = queued_item.get("price")
                     if not current_price and data_type == "bar":
-                        current_price = self.trading_state.last_bar_close
+                        current_price = (
+                            self.trading_state.last_bar_close
+                            or queued_item.get("close")
+                        )
 
                     if current_price:
                         signal = self.trading_strategy.get_signal(

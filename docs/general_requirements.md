@@ -1,5 +1,7 @@
 # CQF FINAL PROJECTS
 
+> **课堂参考**：本文档来源于课堂作业，仅作参考；实际项目流程与贡献指南以仓库 README 为准。
+
 *by Dr Richard Diamond, PhD CQF ARPM*
 
 ## Preparation

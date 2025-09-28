@@ -223,11 +223,13 @@ class PerformanceAnalyzer:
             return {"turnover_rate": 0.0, "analysis_period": period_days}
 
         # Get trades within the specified period
-        end_date = max(trade.timestamp for trade in self.trades)
-        start_date = end_date - timedelta(days=period_days)
+        trade_window_end = max(trade.timestamp for trade in self.trades)
+        trade_window_start = trade_window_end - timedelta(days=period_days)
 
         period_trades = [
-            t for t in self.trades if start_date <= t.timestamp <= end_date
+            t
+            for t in self.trades
+            if trade_window_start <= t.timestamp <= trade_window_end
         ]
 
         if not period_trades:
@@ -239,11 +241,16 @@ class PerformanceAnalyzer:
         )
 
         # Calculate the average portfolio value
-        period_portfolio_values = [
-            value
-            for timestamp, value in self.portfolio_values
-            if start_date <= timestamp <= end_date
-        ]
+        if self.portfolio_values:
+            pv_end = max(timestamp for timestamp, _ in self.portfolio_values)
+            pv_start = pv_end - timedelta(days=period_days)
+            period_portfolio_values = [
+                value
+                for timestamp, value in self.portfolio_values
+                if pv_start <= timestamp <= pv_end
+            ]
+        else:
+            period_portfolio_values = []
 
         if not period_portfolio_values:
             avg_portfolio_value = self.initial_capital
