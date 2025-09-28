@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Import functions and classes from the modules
 from patf_trading_framework.strategies import REGISTRY
+from patf_trading_framework.strategies.buy_and_hold import BuyAndHoldStrategy
 from patf_trading_framework.backtest_utils import analyze_optimization_results
 from patf_trading_framework.data_utils import (
     apply_kalman_filter,
@@ -394,6 +395,29 @@ def main():
             else:
                 maxcpus_opt = min(backtest_config["max_cpus"], cpu_count)
             logger.info(f"Will use {maxcpus_opt} CPU cores for optimization.")
+
+            # Optionally add a benchmark run before looping through active strategies
+            benchmark_cfg = config.get("benchmark", {})
+            if benchmark_cfg.get("enabled"):
+                bench_name = benchmark_cfg.get("name", "Buy & Hold")
+                bench_params = {"size_pct": benchmark_cfg.get("size_pct", 1.0)}
+                logger.info(
+                    f"\n===== Processing Benchmark: {bench_name} ====="
+                )
+                cerebro_bench, bench_results = run_backtest(
+                    strategy_cls=BuyAndHoldStrategy,
+                    data_feed=data_feed,
+                    initial_cash=initial_cash,
+                    commission=commission,
+                    slippage_perc=slippage_perc,
+                    risk_config=config.get('live_trading', {}).get('risk_limits', {}),
+                    single_run_params=bench_params,
+                    optimize=False,
+                    strategy_name=bench_name,
+                )
+                results_comparison[bench_name] = bench_results
+                cerebro_instances[bench_name] = cerebro_bench
+                strategy_names.append(bench_name)
 
             # Loop through all strategies defined in configuration
             for strategy_key, strategy_config in config["strategies"].items():

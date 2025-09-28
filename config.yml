@@ -21,6 +21,13 @@ paths:
   chart_dir: "output/charts"
   cache_dir: "output/cache"
 
+# --- Benchmark Configuration ---
+benchmark:
+  enabled: true
+  type: "buy_and_hold"
+  size_pct: 1.0
+  name: "Buy & Hold"
+
 # --- Database Configuration ---
 # By default we keep things simple and store data in a local SQLite file.
 # Switch `backend` to `postgresql` and supply host/user/password fields when

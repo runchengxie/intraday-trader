@@ -2,6 +2,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -43,6 +44,8 @@ class PerformanceAnalyzer:
         self.cash = initial_capital
         # --- OPTIMIZATION: Store the latest known market prices ---
         self.latest_market_prices: dict[str, float] = {}
+        self.benchmark_returns: Optional[pd.Series] = None
+        self.benchmark_name: str = "Benchmark"
 
         logger.info(
             f"Performance analyzer initialized with initial capital: {initial_capital:,.2f}"
@@ -122,6 +125,90 @@ class PerformanceAnalyzer:
 
         returns = df["value"].pct_change().dropna()
         return returns
+
+    def attach_benchmark_series(
+        self,
+        series: pd.Series,
+        name: str = "Benchmark",
+        is_price_series: bool = True,
+    ):
+        """Attach a benchmark series (price or returns) for relative performance."""
+
+        if series is None or len(series) == 0:
+            logger.warning("Benchmark series is empty; skipping attachment.")
+            return
+
+        benchmark_series = series.dropna().sort_index()
+        if benchmark_series.empty:
+            logger.warning("Benchmark series contains only NaNs after cleaning; skipping.")
+            return
+
+        if is_price_series:
+            returns = benchmark_series.pct_change().dropna()
+        else:
+            returns = benchmark_series
+
+        if returns.empty:
+            logger.warning(
+                "Benchmark series has insufficient data to compute returns; skipping."
+            )
+            return
+
+        self.benchmark_returns = returns
+        self.benchmark_name = name
+        logger.info("Benchmark series '%s' attached (%d observations).", name, len(returns))
+
+    def calculate_relative_performance(self) -> dict:
+        """Calculate relative performance metrics versus the attached benchmark."""
+
+        if self.benchmark_returns is None or self.benchmark_returns.empty:
+            return {}
+
+        portfolio_returns = self.calculate_returns()
+        combined = pd.concat(
+            [portfolio_returns.rename("portfolio"), self.benchmark_returns.rename("benchmark")],
+            axis=1,
+            join="inner",
+        ).dropna()
+
+        if combined.empty:
+            return {}
+
+        port = combined["portfolio"]
+        bench = combined["benchmark"]
+
+        bench_var = np.var(bench)
+        beta = np.cov(port, bench)[0, 1] / bench_var if bench_var > 0 else None
+        alpha = port.mean() - (beta * bench.mean() if beta is not None else 0.0)
+        active_returns = port - bench
+        tracking_error = active_returns.std(ddof=1)
+        information_ratio = (
+            active_returns.mean() / tracking_error if tracking_error > 0 else None
+        )
+
+        cumulative_port = (1 + port).cumprod()
+        cumulative_bench = (1 + bench).cumprod()
+
+        result = {
+            "benchmark_name": self.benchmark_name,
+            "benchmark_total_return": cumulative_bench.iloc[-1] - 1,
+            "strategy_total_return": cumulative_port.iloc[-1] - 1,
+            "active_return": (cumulative_port.iloc[-1] - cumulative_bench.iloc[-1]),
+            "alpha": alpha,
+            "beta": beta,
+            "tracking_error": tracking_error,
+            "information_ratio": information_ratio,
+        }
+
+        logger.info(
+            "Relative performance vs %s: alpha %.4f, beta %.4f, IR %s",
+            self.benchmark_name,
+            alpha if alpha is not None else float("nan"),
+            beta if beta is not None else float("nan"),
+            f"{information_ratio:.4f}" if information_ratio is not None else "nan",
+        )
+
+        return result
 
     def calculate_turnover_rate(self, period_days: int = 30) -> dict:
         """
@@ -502,6 +589,10 @@ class PerformanceAnalyzer:
             "concentration_risk": self.calculate_concentration_risk(),
         }
 
+        benchmark_report = self.calculate_relative_performance()
+        if benchmark_report:
+            report["benchmark_analysis"] = benchmark_report
+
         # Add summary metrics for quick overview
         if report["returns_analysis"]:
             report["summary"] = {
@@ -517,6 +608,18 @@ class PerformanceAnalyzer:
                     "max_weight", 0.0
                 ),
             }
+            if benchmark_report:
+                report["summary"].update(
+                    {
+                        "benchmark_total_return": benchmark_report.get(
+                            "benchmark_total_return", 0.0
+                        ),
+                        "alpha": benchmark_report.get("alpha"),
+                        "information_ratio": benchmark_report.get(
+                            "information_ratio"
+                        ),
+                    }
+                )
 
         logger.info("Performance report generation complete.")
 
@@ -555,7 +658,27 @@ class PerformanceAnalyzer:
         )
         portfolio_df.set_index("timestamp", inplace=True)
 
-        axes[0, 0].plot(portfolio_df.index, portfolio_df["value"])
+        axes[0, 0].plot(portfolio_df.index, portfolio_df["value"], label="Strategy")
+        if self.benchmark_returns is not None and not self.benchmark_returns.empty:
+            benchmark_curve = (1 + self.benchmark_returns).cumprod()
+            benchmark_curve = benchmark_curve.reindex(
+                portfolio_df.index, method="ffill"
+            )
+            if benchmark_curve.dropna().empty:
+                logger.warning(
+                    "Benchmark curve could not be aligned for plotting; skipping overlay."
+                )
+            else:
+                scaled_benchmark = (
+                    benchmark_curve
+                    * (self.initial_capital / benchmark_curve.dropna().iloc[0])
+                )
+                axes[0, 0].plot(
+                    scaled_benchmark.index,
+                    scaled_benchmark,
+                    label=self.benchmark_name,
+                    linestyle="--",
+                )
         axes[0, 0].axhline(
             y=self.initial_capital,
             color="r",
