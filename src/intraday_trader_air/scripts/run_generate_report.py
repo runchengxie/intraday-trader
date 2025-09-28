@@ -7,10 +7,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from patf_trading_framework.configuration import load_app_config
-from patf_trading_framework.db_handler import DBHandler
-from patf_trading_framework.logging_utils import ensure_directory
-from patf_trading_framework.performance_analyzer import PerformanceAnalyzer
+from intraday_trader_air.configuration import load_app_config
+from intraday_trader_air.db_handler import DBHandler
+from intraday_trader_air.logging_utils import ensure_directory
+from intraday_trader_air.performance_analyzer import PerformanceAnalyzer
 
 
 def main():

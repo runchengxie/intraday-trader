@@ -3,7 +3,7 @@ import pytest
 
 np = pytest.importorskip("numpy")
 
-from patf_trading_framework.risk_manager import RiskManager
+from intraday_trader_air.risk_manager import RiskManager
 
 # --- Pytest Fixtures ---
 

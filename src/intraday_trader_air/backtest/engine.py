@@ -8,10 +8,10 @@ from typing import Any, Mapping
 
 import backtrader as bt
 
-from patf_trading_framework.backtest_utils import analyze_optimization_results
-from patf_trading_framework.exception_handler import ExceptionHandler
-from patf_trading_framework.performance_analyzer import PerformanceAnalyzer
-from patf_trading_framework.risk_manager import RiskManager
+from intraday_trader_air.backtest_utils import analyze_optimization_results
+from intraday_trader_air.exception_handler import ExceptionHandler
+from intraday_trader_air.performance_analyzer import PerformanceAnalyzer
+from intraday_trader_air.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
 

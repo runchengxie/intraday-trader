@@ -36,7 +36,7 @@ RUN useradd --create-home --shell /bin/bash trader
 COPY --from=builder /app/dist /wheels/
 
 # Copy the entrypoint scripts
-COPY src/patf_trading_framework/scripts/ /app/scripts/
+COPY src/intraday_trader_air/scripts/ /app/scripts/
 
 # Copy the configuration file
 COPY config.yml /app/config.yml
@@ -55,7 +55,7 @@ USER trader
 
 # Simple healthcheck to ensure the CLI is callable
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import patf_trading_framework" || exit 1
+    CMD python -c "import intraday_trader_air" || exit 1
 
 # Set the default command to run when the container starts.
-CMD ["patf", "live"]
+CMD ["intraday", "live"]

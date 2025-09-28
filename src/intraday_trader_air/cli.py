@@ -1,4 +1,4 @@
-"""Command-line entry point for the PATF trading framework."""
+"""Command-line entry point for the Intraday Trader Air framework."""
 
 from __future__ import annotations
 
@@ -7,22 +7,22 @@ import importlib
 from collections.abc import Callable, Sequence
 
 _BACKTEST_COMMANDS = {
-    "run": "patf_trading_framework.scripts.run_backtests:run_command",
-    "optimise": "patf_trading_framework.scripts.run_backtests:optimise_command",
-    "optimize": "patf_trading_framework.scripts.run_backtests:optimise_command",
-    "benchmark": "patf_trading_framework.scripts.run_backtests:benchmark_command",
+    "run": "intraday_trader_air.scripts.run_backtests:run_command",
+    "optimise": "intraday_trader_air.scripts.run_backtests:optimise_command",
+    "optimize": "intraday_trader_air.scripts.run_backtests:optimise_command",
+    "benchmark": "intraday_trader_air.scripts.run_backtests:benchmark_command",
 }
 
 _SIMPLE_COMMANDS = {
-    "update-data": "patf_trading_framework.scripts.run_update_data:main",
-    "generate-report": "patf_trading_framework.scripts.run_generate_report:main",
-    "live": "patf_trading_framework.scripts.run_live_trading:main",
-    "dashboard": "patf_trading_framework.scripts.run_dashboard:main",
+    "update-data": "intraday_trader_air.scripts.run_update_data:main",
+    "generate-report": "intraday_trader_air.scripts.run_generate_report:main",
+    "live": "intraday_trader_air.scripts.run_live_trading:main",
+    "dashboard": "intraday_trader_air.scripts.run_dashboard:main",
 }
 
 
 class CommandNotFoundError(RuntimeError):
-    """Raised when a user invokes an unknown PATF subcommand."""
+    """Raised when a user invokes an unknown Intraday Trader Air subcommand."""
 
 
 def _load_callable(path: str) -> Callable[[Sequence[str] | None], int | None]:
@@ -36,9 +36,9 @@ def _load_callable(path: str) -> Callable[[Sequence[str] | None], int | None]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="patf",
+        prog="intraday",
         description=(
-            "PATF (Python Algorithmic Trading Framework) command-line interface. "
+            "Intraday Trader Air command-line interface. "
             "Use one of the available subcommands to interact with the framework."
         ),
     )

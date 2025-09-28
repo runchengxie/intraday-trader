@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("pytest_asyncio")
 pytest.importorskip("alpaca_trade_api")
 
-from patf_trading_framework.broker_handler import BrokerAPIHandler
+from intraday_trader_air.broker_handler import BrokerAPIHandler
 
 REQUIRED_ENV_VARS = ["APCA_API_KEY_ID", "APCA_API_SECRET_KEY"]
 

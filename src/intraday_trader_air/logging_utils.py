@@ -1,4 +1,4 @@
-"""Centralised logging utilities for PATF."""
+"""Centralised logging utilities for Intraday Trader Air."""
 
 from __future__ import annotations
 

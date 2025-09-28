@@ -8,9 +8,9 @@ from pathlib import Path
 from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
 
-from patf_trading_framework.configuration import load_app_config
-from patf_trading_framework.data_utils import fetch_historical_data
-from patf_trading_framework.db_handler import DBHandler
+from intraday_trader_air.configuration import load_app_config
+from intraday_trader_air.data_utils import fetch_historical_data
+from intraday_trader_air.db_handler import DBHandler
 
 # (Configure logging)
 logging.basicConfig(

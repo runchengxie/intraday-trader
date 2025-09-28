@@ -10,10 +10,10 @@ from dotenv import load_dotenv
 # Ensures that other project modules can be found by Streamlit
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
-from patf_trading_framework.configuration import load_app_config
-from patf_trading_framework.db_handler import DBHandler
-from patf_trading_framework.performance_analyzer import PerformanceAnalyzer
-from patf_trading_framework.risk_manager import RiskManager
+from intraday_trader_air.configuration import load_app_config
+from intraday_trader_air.db_handler import DBHandler
+from intraday_trader_air.performance_analyzer import PerformanceAnalyzer
+from intraday_trader_air.risk_manager import RiskManager
 
 # --- Main Application Logic ---
 st.set_page_config(layout="wide", page_title="Trading Performance Dashboard")

@@ -3,7 +3,7 @@ import pytest
 pytest.importorskip("alpaca_trade_api")
 from alpaca_trade_api.rest import APIError
 
-from patf_trading_framework.broker_handler import BrokerAPIHandler
+from intraday_trader_air.broker_handler import BrokerAPIHandler
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def mock_broker_dependencies(monkeypatch, mocker):
     mock_rest.get_account.return_value = mocker.MagicMock(
         id="acct-123", status="ACTIVE", buying_power="100000"
     )
-    mocker.patch("patf_trading_framework.broker_handler.REST", return_value=mock_rest)
+    mocker.patch("intraday_trader_air.broker_handler.REST", return_value=mock_rest)
 
     return mock_rest
 
