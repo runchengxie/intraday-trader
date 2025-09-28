@@ -31,6 +31,7 @@ services:
       - APCA_API_SECRET_KEY
       - ALPACA_BASE_URL=https://paper-api.alpaca.markets
       - PYTHONUNBUFFERED=1
+      - DB_BACKEND=postgresql
       # Environment variables for the database connection
       - DB_HOST=db # Use the service name ('db') as the hostname to connect to the database container
       - DB_PORT=5432

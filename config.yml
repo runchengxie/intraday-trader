@@ -36,6 +36,11 @@ benchmark:
 database:
   backend: ${DB_BACKEND:-sqlite}
   path: ${DB_PATH:-output/trading.db}
+  host: ${DB_HOST:-}
+  port: ${DB_PORT:-}
+  user: ${DB_USER:-}
+  password: ${DB_PASSWORD:-}
+  dbname: ${DB_NAME:-}
 
 # --- Backtest Configuration ---
 backtest:
