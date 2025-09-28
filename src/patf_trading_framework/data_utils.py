@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 import numpy as np
 import pandas as pd
 
+NY_TIMEZONE = "America/New_York"
 from .db_handler import DBHandler
 
 
@@ -55,6 +56,115 @@ def get_last_trading_day(api_instance, target_date_str):
         return None
 
 
+def _build_cache_path(cache_dir: str, symbol: str, timeframe, start_date: str, end_date: str) -> str:
+    os.makedirs(cache_dir, exist_ok=True)
+    timeframe_str = str(timeframe).replace("TimeFrame.", "")
+    cache_filename = f"{symbol}_{timeframe_str}_{start_date}_{end_date}.parquet"
+    return os.path.join(cache_dir, cache_filename)
+
+
+def _normalize_index_and_clip(df: pd.DataFrame, start_date: str, end_date: str) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+
+    normalized = df.copy()
+    index = normalized.index
+    if not isinstance(index, pd.DatetimeIndex):
+        index = pd.to_datetime(index, utc=True)
+    if index.tz is None:
+        index = index.tz_localize("UTC")
+    normalized.index = index.tz_convert(NY_TIMEZONE)
+
+    start_ts = pd.Timestamp(start_date, tz=NY_TIMEZONE)
+    end_ts = pd.Timestamp(end_date, tz=NY_TIMEZONE) + timedelta(days=1)
+    mask = (normalized.index >= start_ts) & (normalized.index < end_ts)
+    return normalized.loc[mask]
+
+
+def _load_from_db(
+    db_handler: DBHandler | None, symbol: str, start_date: str, end_date: str
+) -> pd.DataFrame | None:
+    if not db_handler:
+        return None
+
+    end_date_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
+    end_date_query = end_date_dt.strftime("%Y-%m-%d")
+    db_data = db_handler.get_market_data(symbol, start_date, end_date_query)
+
+    if db_data is None or db_data.empty:
+        logger.info(
+            "No database records found for %s between %s and %s.",
+            symbol,
+            start_date,
+            end_date,
+        )
+        return None
+
+    logger.info("Successfully loaded data for %s from the database.", symbol)
+    return db_data
+
+
+def _load_from_cache(cache_filepath: str) -> pd.DataFrame | None:
+    if not os.path.exists(cache_filepath):
+        return None
+
+    try:
+        logger.info("Loading data from cache: %s", cache_filepath)
+        return pd.read_parquet(cache_filepath)
+    except Exception as exc:  # pragma: no cover - log path for debugging only
+        logger.warning(
+            "Error loading data from cache %s: %s. Will attempt to fetch from API.",
+            cache_filepath,
+            exc,
+        )
+        return None
+
+
+def _fetch_from_api(
+    api,
+    symbol: str,
+    timeframe,
+    start_date: str,
+    end_date: str,
+) -> pd.DataFrame | None:
+    try:
+        logger.info(
+            "Fetching %s %s data from %s to %s via API...",
+            symbol,
+            timeframe,
+            start_date,
+            end_date,
+        )
+        start_dt_iso = (
+            pd.Timestamp(start_date, tz=NY_TIMEZONE).tz_convert("UTC").isoformat()
+        )
+        end_dt_iso = (
+            (
+                pd.Timestamp(end_date, tz=NY_TIMEZONE)
+                + timedelta(days=1)
+                - timedelta(seconds=1)
+            )
+            .tz_convert("UTC")
+            .isoformat()
+        )
+
+        bars = api.get_bars(
+            symbol, timeframe, start=start_dt_iso, end=end_dt_iso, adjustment="raw"
+        ).df
+        return bars if bars is not None else None
+    except Exception as exc:
+        logger.error("Error fetching %s data: %s", symbol, exc)
+        return None
+
+
+def _cache_data(df: pd.DataFrame, cache_filepath: str) -> None:
+    try:
+        df.to_parquet(cache_filepath, engine="pyarrow", compression="snappy")
+        logger.info("Data cached to: %s", cache_filepath)
+    except Exception as exc:  # pragma: no cover - caching failures are non-fatal
+        logger.warning("Error caching data: %s", exc)
+
+
 def fetch_historical_data(
     api,
     symbol,
@@ -68,131 +178,42 @@ def fetch_historical_data(
     Fetches historical bar data, using the database as the primary cache.
     Falls back to the Alpaca API if data is not in the database.
     """
-    # --- 1. Try fetching from Database ---
-    if db_handler:
-        # End date for query needs to be exclusive
-        end_date_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
-        end_date_query = end_date_dt.strftime("%Y-%m-%d")
 
-        db_data = db_handler.get_market_data(symbol, start_date, end_date_query)
-        if not db_data.empty:
-            logger.info(f"Successfully loaded data for {symbol} from the database.")
-            # Filter again to ensure strict date range
-            db_data = db_data[start_date:end_date]
-            return db_data
+    cache_filepath = _build_cache_path(cache_dir, symbol, timeframe, start_date, end_date)
 
-    # --- 2. Fallback to API Fetch (original logic) ---
-    logger.info(f"Data for {symbol} not found in DB, fetching from API...")
-    # --- Cache Handling ---
-    # Ensure cache directory exists
-    os.makedirs(cache_dir, exist_ok=True)
+    data_source = "database"
+    bars = _load_from_db(db_handler, symbol, start_date, end_date)
 
-    # Create a unique filename for the cache
-    timeframe_str = str(timeframe).replace(
-        "TimeFrame.", ""
-    )  # Get a string representation like 'Minute'
-    cache_filename = f"{symbol}_{timeframe_str}_{start_date}_{end_date}.parquet"
-    cache_filepath = os.path.join(cache_dir, cache_filename)
+    if bars is None:
+        data_source = "cache"
+        bars = _load_from_cache(cache_filepath)
 
-    # Check if cached file exists
-    if os.path.exists(cache_filepath):
-        try:
-            logger.info(f"Loading data from cache: {cache_filepath}")  # Use logger
-            bars = pd.read_parquet(cache_filepath)
-            # Parquet usually handles timezone better, but double-check
-            if not isinstance(bars.index, pd.DatetimeIndex):
-                bars.index = pd.to_datetime(bars.index)  # Ensure index is datetime
-            if bars.index.tz is None:
-                bars.index = bars.index.tz_localize("UTC")  # Assume UTC if no timezone
-            bars.index = bars.index.tz_convert(
-                "America/New_York"
-            )  # Convert to desired timezone
-            # Filter again to ensure strict date range after loading from cache
-            bars = bars[
-                (bars.index >= pd.Timestamp(start_date, tz="America/New_York"))
-                & (
-                    bars.index
-                    <= pd.Timestamp(end_date, tz="America/New_York") + timedelta(days=1)
-                )
-            ]
-            logger.info(
-                f"Successfully loaded {len(bars)} data points from cache."
-            )  # Use logger
-            return bars
-        except Exception as e:
-            logger.warning(
-                f"Error loading data from cache: {e}. Will attempt to fetch from API."
-            )  # Use logger
-            # If loading fails, proceed to fetch from API
+    if bars is None:
+        data_source = "api"
+        bars = _fetch_from_api(api, symbol, timeframe, start_date, end_date)
 
-    # --- Fetch from API (if not cached or cache load failed) ---
-    try:
-        logger.info(
-            f"Fetching {symbol} {timeframe} data from {start_date} to {end_date} via API..."
-        )  # Use logger
-        # Note: Alpaca's get_bars returns data in UTC.
-        start_dt_iso = (
-            pd.Timestamp(start_date, tz="America/New_York")
-            .tz_convert("UTC")
-            .isoformat()
-        )
-        end_dt_iso = (
-            (
-                pd.Timestamp(end_date, tz="America/New_York")
-                + timedelta(days=1)
-                - timedelta(seconds=1)
-            )
-            .tz_convert("UTC")
-            .isoformat()
-        )
-
-        api_bars = api.get_bars(
-            symbol, timeframe, start=start_dt_iso, end=end_dt_iso, adjustment="raw"
-        ).df
-
-        if not api_bars.empty:
-            # Convert index to America/New_York timezone for consistency
-            api_bars.index = api_bars.index.tz_convert("America/New_York")
-            # Filter data strictly within the requested start/end dates in NY time
-            api_bars = api_bars[
-                (api_bars.index >= pd.Timestamp(start_date, tz="America/New_York"))
-                & (
-                    api_bars.index
-                    <= pd.Timestamp(end_date, tz="America/New_York") + timedelta(days=1)
-                )
-            ]
-
-            logger.info(
-                f"Successfully fetched {len(api_bars)} data points from API."
-            )  # Use logger
-
-            # --- 3. Save newly fetched data to Database and Cache ---
-            if not api_bars.empty:
-                # Save to DB
-                if db_handler:
-                    db_handler.save_market_data(api_bars.copy(), symbol)
-
-                # Save to file cache (can be kept as a backup)
-                try:
-                    # Use df.to_parquet. No need to reset index usually.
-                    # Specify the engine and potentially compression
-                    api_bars.to_parquet(
-                        cache_filepath, engine="pyarrow", compression="snappy"
-                    )  # 'snappy' is a common choice
-                    logger.info(f"Data cached to: {cache_filepath}")  # Use logger
-                except Exception as e:
-                    logger.warning(
-                        f"Error caching data: {e}"
-                    )  # Use logger - Log caching error but continue
-
-            return api_bars
-        else:
-            logger.warning(f"No data retrieved for {symbol} from any source.")
-            return None  # Return None if no data fetched
-
-    except Exception as e:
-        logger.error(f"Error fetching {symbol} data: {e}")  # Use logger
+    if bars is None or getattr(bars, "empty", False):
+        logger.warning("No data retrieved for %s from any source.", symbol)
         return None
+
+    bars = _normalize_index_and_clip(bars, start_date, end_date)
+
+    if bars is None or bars.empty:
+        logger.warning("No data retrieved for %s after applying filters.", symbol)
+        return None
+
+    if data_source == "api":
+        if db_handler:
+            db_handler.save_market_data(bars.copy(), symbol)
+        _cache_data(bars, cache_filepath)
+
+    logger.info(
+        "Successfully loaded %d data points for %s via %s.",
+        len(bars),
+        symbol,
+        data_source,
+    )
+    return bars
 
 
 # --- Price smoothing helper (formerly Kalman filter) ---
