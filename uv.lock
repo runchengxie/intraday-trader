@@ -1319,15 +1319,6 @@ dashboard = [
     { name = "seaborn" },
     { name = "streamlit" },
 ]
-dev = [
-    { name = "ipykernel" },
-    { name = "jupyterlab" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
 postgres = [
     { name = "psycopg2-binary" },
 ]
@@ -1337,17 +1328,24 @@ test = [
     { name = "pytest-cov" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "ipykernel" },
+    { name = "jupyterlab" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "alpaca-trade-api" },
     { name = "backtrader" },
-    { name = "ipykernel", marker = "extra == 'dev'" },
-    { name = "jupyterlab", marker = "extra == 'dev'" },
     { name = "matplotlib", specifier = ">=3.5" },
     { name = "numpy", specifier = "==1.26.4" },
     { name = "pandas", specifier = ">=1.5" },
-    { name = "patf-trading-framework", extras = ["test"], marker = "extra == 'dev'" },
-    { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "psycopg2-binary", marker = "extra == 'postgres'" },
     { name = "pyarrow", specifier = ">=11.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0" },
@@ -1356,14 +1354,24 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=0.21" },
     { name = "pyyaml" },
     { name = "requests", specifier = ">=2.28" },
-    { name = "ruff", marker = "extra == 'dev'" },
     { name = "scipy", specifier = ">=1.8" },
     { name = "seaborn", marker = "extra == 'dashboard'", specifier = ">=0.12" },
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "streamlit", marker = "extra == 'dashboard'" },
     { name = "websockets", specifier = ">=10.0" },
 ]
-provides-extras = ["test", "dev", "postgres", "dashboard"]
+provides-extras = ["test", "postgres", "dashboard"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipykernel" },
+    { name = "jupyterlab" },
+    { name = "pre-commit" },
+    { name = "pytest", specifier = ">=7.0" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
 
 [[package]]
 name = "pexpect"
