@@ -181,34 +181,34 @@ flowchart LR
 
    #### 回测/优化常用参数
 
-   * 默认情况下，`intraday backtest run` 会先运行买入持有基准，再依次执行配置文件中的全部策略。如果希望只测试部分策略，可多次传入 `--strategy`：
+   * 默认情况下，`run-backtest` 会先运行买入持有基准，再依次执行配置文件中的全部策略。如果希望只测试部分策略，可多次传入 `--strategy`：
 
     ```bash
     # 在不指定选项的时候将同时完成三个策略和 benchmark 的回测
-    intraday backtest run
+    run-backtest
 
     # 只运行 ema_crossover 策略
-    intraday backtest run --strategy ema_crossover
+    run-backtest --strategy ema_crossover
 
     # 只运行 mean_reversion 策略
-    intraday backtest run --strategy mean_reversion
+    run-backtest --strategy mean_reversion
 
     # 只运行 custom_ratio 策略
-    intraday backtest run --strategy custom_ratio
+    run-backtest --strategy custom_ratio
 
     # 指定同时跑多个策略的回测
-    intraday backtest run --strategy ema_crossover --strategy mean_reversion
+    run-backtest --strategy ema_crossover --strategy mean_reversion
     ```
 
-* 若只想生成买入持有序列，可使用 `intraday backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
+* 若只想生成买入持有序列，可使用 `run-backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
 
     ```bash
-     intraday backtest run --no-benchmark
+     run-backtest --no-benchmark
     ```
 
-* 若希望回测阶段严格要求 `trade_count` 与 `vwap` 均来自数据库缓存，可在 `config.yml` 的 `data.require_full_fields` 字段设置为 `true`。若验证失败，CLI 会提示先执行 `intraday data backfill` 以补齐历史缺失列。
+* 若希望回测阶段严格要求 `trade_count` 与 `vwap` 均来自数据库缓存，可在 `config.yml` 的 `data.require_full_fields` 字段设置为 `true`。若验证失败，CLI 会提示先执行 `run-backfill` 以补齐历史缺失列。
 
-* `intraday backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
+* `run-backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
 
 * 回测、优化和数据更新命令会将日志写入 `output/logs`，图表输出至 `output/charts`（可在 `config.yml` 的 `paths` 段自定义）。
 
