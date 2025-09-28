@@ -12,22 +12,22 @@ import websockets
 import yaml
 from dotenv import load_dotenv
 
-from patf_trading_framework.broker_handler import BrokerAPIHandler
-from patf_trading_framework.consistency_validator import ConsistencyValidator
-from patf_trading_framework.exception_handler import (
+from intraday_trader_air.broker_handler import BrokerAPIHandler
+from intraday_trader_air.consistency_validator import ConsistencyValidator
+from intraday_trader_air.exception_handler import (
     ErrorCategory,
     ErrorSeverity,
     ExceptionHandler,
     handle_exceptions,
 )
-from patf_trading_framework.live_components import (
+from intraday_trader_air.live_components import (
     LiveMeanReversionStrategy,
     TradingState,
 )
-from patf_trading_framework.performance_analyzer import PerformanceAnalyzer
+from intraday_trader_air.performance_analyzer import PerformanceAnalyzer
 
 # Import core modules
-from patf_trading_framework.risk_manager import RiskManager
+from intraday_trader_air.risk_manager import RiskManager
 
 # Logger will be configured in main() after loading config
 logger = logging.getLogger(__name__)

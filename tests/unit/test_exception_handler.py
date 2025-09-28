@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from patf_trading_framework.exception_handler import (
+from intraday_trader_air.exception_handler import (
     CircuitBreaker,
     ErrorCategory,
     ErrorSeverity,

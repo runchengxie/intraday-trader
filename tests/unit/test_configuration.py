@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("yaml")
 
-from patf_trading_framework.configuration import ConfigurationError, load_app_config
+from intraday_trader_air.configuration import ConfigurationError, load_app_config
 
 
 def test_load_app_config(tmp_path: Path):

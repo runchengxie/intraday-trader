@@ -11,8 +11,8 @@ from sqlalchemy import inspect, text
 
 from dataclasses import asdict
 
-from patf_trading_framework.configuration import load_app_config
-from patf_trading_framework.db_handler import (
+from intraday_trader_air.configuration import load_app_config
+from intraday_trader_air.db_handler import (
     DBHandler,
     PerformanceSnapshot,
     TradeLog,

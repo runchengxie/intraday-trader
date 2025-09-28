@@ -22,9 +22,9 @@
 
 ### 可安装的 CLI 与脚本分发
 
-* `pyproject.toml` 声明 `patf` 顶层命令，并在其下挂载 `backtest run/optimise/benchmark`、`update-data`、`live` 等子命令，安装后即可在任意环境调用。
+* `pyproject.toml` 声明 `intraday` 顶层命令，并在其下挂载 `backtest run/optimise/benchmark`、`update-data`、`live` 等子命令，安装后即可在任意环境调用。
 
-* `src/patf_trading_framework/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
+* `src/intraday_trader_air/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
 
 ### 数据持久化与配置解耦
 
@@ -66,7 +66,7 @@ flowchart LR
 
     subgraph Backtest_and_Analytics["回测与分析"]
         direction TB
-        BacktestScript[patf backtest]
+        BacktestScript[intraday backtest]
         ReportScript[run-generate-report]
         DashboardScript[run-dashboard]
         Data_Utils[data_utils.py]
@@ -106,8 +106,8 @@ flowchart LR
 1. 克隆仓库
 
    ```bash
-   git clone https://github.com/runchengxie/algorithmic-trading-framework.git
-   cd algorithmic-trading-framework
+   git clone https://github.com/runchengxie/intraday-trader-air.git
+   cd intraday-trader-air
    ```
 
 2. 创建环境变量文件
@@ -162,19 +162,19 @@ flowchart LR
 
 4. 运行命令行工具
 
-   * 更新行情数据：`patf update-data`
+   * 更新行情数据：`intraday update-data`
 
-   * 回测策略：`patf backtest run`
+   * 回测策略：`intraday backtest run`
 
-   * 参数优化：`patf backtest optimise`
+   * 参数优化：`intraday backtest optimise`
 
-   * 基准对比：`patf backtest benchmark`
+   * 基准对比：`intraday backtest benchmark`
 
-   * 生成报表：`patf generate-report`
+   * 生成报表：`intraday generate-report`
 
-   * 启动纸上交易：`patf live`
+   * 启动纸上交易：`intraday live`
 
-   * 启动仪表盘：`patf dashboard`
+   * 启动仪表盘：`intraday dashboard`
 
    若需仪表盘，安装时请带上 `dashboard` 可选依赖：
 
@@ -267,9 +267,9 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 | 任务 | 推荐频率 | 命令 | 备注 |
 | --- | --- | --- | --- |
-| 行情更新 | 每日开盘前 | `patf update-data` | 需要 Alpaca API 密钥与数据库连接 |
-| 回测回归 | 每周或策略改动时 | `patf backtest run` / `patf backtest optimise` | 可结合参数优化输出对比图表 |
-| 日报生成 | 每日收盘后 | `patf generate-report` | 产出 JSON，可再由 CI 推送到 S3/钉钉等 |
+| 行情更新 | 每日开盘前 | `intraday update-data` | 需要 Alpaca API 密钥与数据库连接 |
+| 回测回归 | 每周或策略改动时 | `intraday backtest run` / `intraday backtest optimise` | 可结合参数优化输出对比图表 |
+| 日报生成 | 每日收盘后 | `intraday generate-report` | 产出 JSON，可再由 CI 推送到 S3/钉钉等 |
 
 若在 GitHub Actions 部署，请记得在仓库 Secrets 中配置 Alpaca 凭证与数据库密码。
 
@@ -289,7 +289,7 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 ```tree
 .
-├── src/patf_trading_framework/   # 核心代码（策略、数据、风险、实盘引擎）
+├── src/intraday_trader_air/   # 核心代码（策略、数据、风险、实盘引擎）
 │   └── strategies/               # 策略包（含基类、注册表与具体策略实现）
 ├── tests/                        # 单元测试与集成测试
 ├── docs/                         # 文档与设计说明
@@ -309,7 +309,7 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 3. Docker 是必须的吗？ 不是。Docker 仅提供可复现环境，本地虚拟环境照样可以直接运行脚本。
 
-4. 如何扩展新策略？ 在 `src/patf_trading_framework/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
+4. 如何扩展新策略？ 在 `src/intraday_trader_air/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
 
 5. 如何切换数据存储后端？ 编辑 `config.yml` 的 `database` 配置块即可。示例：
 

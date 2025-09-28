@@ -3,8 +3,8 @@
 UV ?= uv
 
 help:
-	@echo "Common workflows:" \
-	&& echo "  make backtest       # Run local backtest via patf CLI" \
+        @echo "Common workflows:" \
+        && echo "  make backtest       # Run local backtest via intraday CLI" \
 	&& echo "  make update         # Refresh cached market data" \
 	&& echo "  make live           # Start local live trading session" \
 	&& echo "  make dashboard      # Launch Streamlit dashboard" \
@@ -16,16 +16,16 @@ help:
 	&& echo "  make docker-db      # Start TimescaleDB only"
 
 backtest:
-        patf backtest run
+        intraday backtest run
 
 update:
-        patf update-data
+        intraday update-data
 
 live:
-        patf live
+        intraday live
 
 dashboard:
-        patf dashboard
+        intraday dashboard
 
 lint:
         $(UV) run ruff check .
@@ -34,13 +34,13 @@ fmt:
         $(UV) run ruff format .
 
 coverage:
-        $(UV) run pytest --cov=patf_trading_framework --cov-report=term-missing
+        $(UV) run pytest --cov=intraday_trader_air --cov-report=term-missing
 
 docker-build:
 	docker compose build
 
 docker-backtest:
-        docker compose --profile live run --rm trading-bot patf backtest run
+        docker compose --profile live run --rm trading-bot intraday backtest run
 
 docker-live:
 	docker compose --profile live up trading-bot

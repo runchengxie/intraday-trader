@@ -24,7 +24,7 @@ services:
     # Build the image from the Dockerfile in the current directory
     build: .
     # Name the image
-    image: patf-trading-framework:latest
+    image: intraday-trader-air:latest
     # Load environment variables from the host machine
     environment:
       - APCA_API_KEY_ID
@@ -51,7 +51,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import patf_trading_framework"]
+      test: ["CMD", "python", "-c", "import intraday_trader_air"]
       interval: 30s
       timeout: 10s
       retries: 3

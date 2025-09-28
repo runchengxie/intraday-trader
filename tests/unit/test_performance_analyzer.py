@@ -6,7 +6,7 @@ import pytest
 pd = pytest.importorskip("pandas")
 np = pytest.importorskip("numpy")
 
-from patf_trading_framework.performance_analyzer import (
+from intraday_trader_air.performance_analyzer import (
     PerformanceAnalyzer,
     TradeRecord,
 )

@@ -1,4 +1,4 @@
-"""Common pytest fixtures for PATF."""
+"""Common pytest fixtures for Intraday Trader Air."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Iterator
 
 import pytest
 
-from patf_trading_framework.configuration import AppConfig, load_app_config
+from intraday_trader_air.configuration import AppConfig, load_app_config
 
 
 @pytest.fixture(scope="session")

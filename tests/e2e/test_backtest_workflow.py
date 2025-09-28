@@ -3,8 +3,8 @@ import pytest
 bt = pytest.importorskip("backtrader")
 pd = pytest.importorskip("pandas")
 
-from patf_trading_framework.backtest.engine import BacktestRequest, run_backtest
-from patf_trading_framework.strategies import CustomRatioStrategy
+from intraday_trader_air.backtest.engine import BacktestRequest, run_backtest
+from intraday_trader_air.strategies import CustomRatioStrategy
 
 
 def test_full_backtest_run_with_trades():

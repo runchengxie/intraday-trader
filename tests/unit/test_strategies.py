@@ -3,7 +3,7 @@ import pytest
 pd = pytest.importorskip("pandas")
 bt = pytest.importorskip("backtrader")
 
-from patf_trading_framework.strategies import (
+from intraday_trader_air.strategies import (
     CustomRatioStrategy,
     EMACrossoverStrategy,
     MeanReversionZScoreStrategy,
