@@ -43,7 +43,7 @@ EXCLUDE_DIRS_ROOT_ONLY: Set[str] = {
     "tests",
     ".ruff_cache",
     "docs",
-    "notebooks",
+#     "notebooks",
 }
 
 # Directory name patterns to exclude (e.g., any directory ending with .egg-info).
