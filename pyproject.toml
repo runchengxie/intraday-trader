@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A comprehensive Python framework for algorithmic trading strategy development, back-testing, and live trading."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.11"
 license = { file="LICENSE.txt" }
 keywords = ["trading", "algorithmic-trading", "back-testing", "finance", "alpaca"]
 classifiers = [
