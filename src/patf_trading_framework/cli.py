@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 import importlib
 import sys
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
 
 # Mapping from CLI subcommands to the modules that expose a ``main`` function.
-_COMMAND_MODULES: Dict[str, str] = {
+_COMMAND_MODULES: dict[str, str] = {
     "run-backtest": "patf_trading_framework.scripts.run_backtests",
     "run-live": "patf_trading_framework.scripts.run_live_trading",
     "run-update-data": "patf_trading_framework.scripts.run_update_data",
@@ -21,7 +21,7 @@ class CommandNotFoundError(RuntimeError):
     """Raised when a user invokes an unknown PATF subcommand."""
 
 
-def _load_command(command: str) -> Callable[[], Optional[int]]:
+def _load_command(command: str) -> Callable[[], int | None]:
     """Return the ``main`` callable for a given subcommand.
 
     Parameters
@@ -82,7 +82,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Entry point for the ``patf`` console script."""
 
     parser = _build_parser()

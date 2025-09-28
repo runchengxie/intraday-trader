@@ -1,11 +1,10 @@
 """Small helper utilities shared by strategy implementations."""
 
-from typing import Tuple
 
 import backtrader.indicators as btind
 
 
-def compute_zscore(data_series, *, period: int, epsilon: float = 1e-6) -> Tuple:
+def compute_zscore(data_series, *, period: int, epsilon: float = 1e-6) -> tuple:
     """Return the z-score along with its rolling mean and stddev indicators."""
 
     mean = btind.SMA(data_series, period=period)

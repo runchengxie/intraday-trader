@@ -3,10 +3,13 @@ import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
 from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
+
 from patf_trading_framework.data_utils import fetch_historical_data
 from patf_trading_framework.db_handler import DBHandler
+
 from .run_backtests import load_config
 
 # (Configure logging)

@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
+
 import backtrader as bt
 import yaml
 from alpaca_trade_api.rest import REST, TimeFrame
@@ -16,8 +17,6 @@ from urllib3.util.retry import Retry
 logger = logging.getLogger(__name__)
 
 # Import functions and classes from the modules
-from patf_trading_framework.strategies import REGISTRY
-from patf_trading_framework.strategies.buy_and_hold import BuyAndHoldStrategy
 from patf_trading_framework.backtest_utils import analyze_optimization_results
 from patf_trading_framework.data_utils import (
     apply_kalman_filter,
@@ -29,6 +28,8 @@ from patf_trading_framework.exception_handler import (
 )
 from patf_trading_framework.performance_analyzer import PerformanceAnalyzer
 from patf_trading_framework.risk_manager import RiskManager
+from patf_trading_framework.strategies import REGISTRY
+from patf_trading_framework.strategies.buy_and_hold import BuyAndHoldStrategy
 
 
 def _sub_env(s: str) -> str:

@@ -52,7 +52,7 @@ def db_handler():
         handler = DBHandler(db_config)
         logger.info("Initializing test database schema...")
         handler.initialize_db()
-        
+
         # Yield the handler to the tests
         yield handler
 
@@ -157,7 +157,7 @@ def test_market_data_upsert_logic(db_handler, sample_market_data):
     logger.info("Performing second save with identical data...")
     db_handler.save_market_data(sample_market_data, symbol)
     count_after_second_save = len(db_handler.get_market_data(symbol, "2023-01-01", "2023-01-02"))
-    
+
     # Assert
     assert count_after_second_save == 5, "Row count should remain 5, proving ON CONFLICT worked."
     logger.info("Upsert logic verified. No duplicate rows were inserted.")
@@ -171,7 +171,7 @@ def test_log_and_get_trade_record(db_handler):
 
     # Arrange: Create an ORM object
     trade = TradeLog(timestamp=now, order_id=test_order_id, symbol="TEST_TRADE", side="buy", quantity=10, price=150.5, commission=1.0)
-    
+
     # Act: Log the trade and then fetch it back
     logger.info(f"Logging a test trade with order_id: {test_order_id}")
     db_handler.log_trade_record(trade)
@@ -187,7 +187,7 @@ def test_log_and_get_performance_snapshot(db_handler):
     """Tests logging a single performance snapshot and retrieving it."""
     logger.info("--- [Test Case: Log and Get Performance Snapshot] ---")
     now = datetime.utcnow()
-    
+
     # Arrange
     snapshot = PerformanceSnapshot(timestamp=now, portfolio_value=105000.75, cash=25000.25)
 

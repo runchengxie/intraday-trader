@@ -6,6 +6,7 @@ import re
 import signal
 import uuid
 from datetime import datetime
+
 import numpy as np
 import websockets
 import yaml
@@ -78,20 +79,20 @@ class EnhancedTradingSystem:
         self._stop_requested = asyncio.Event()
 
         logger.info("Enhanced trading system initialization completed")
-        
+
     async def _auto_cancel_test_order(self, order_id: str, delay_seconds: int):
         """Automatically cancel a test order after the specified delay"""
         try:
             await asyncio.sleep(delay_seconds)
             logger.info(f"[NO-FILL-TEST] Auto-canceling test order {order_id} after {delay_seconds} seconds")
-            
+
             # Cancel the order
             cancel_result = self.broker_handler.cancel_order(order_id)
             if cancel_result:
                 logger.info(f"[NO-FILL-TEST] Successfully canceled test order {order_id}")
             else:
                 logger.warning(f"[NO-FILL-TEST] Failed to cancel test order {order_id}")
-                
+
         except Exception as e:
             logger.error(f"[NO-FILL-TEST] Error auto-canceling order {order_id}: {e}")
 
@@ -184,19 +185,19 @@ class EnhancedTradingSystem:
             filled_price = float(update_data.get("filled_price", 0))
             remaining_qty = float(update_data.get("remaining_qty", 0))
             client_order_id = update_data.get("client_order_id")
-            
+
             # Enhanced WebSocket event logging as requested
             logger.info(f"[WebSocket EVENT] Order ID: {order_id}, Status: {order_status}")
             logger.info(
                 f"[WebSocket EVENT] Full update - Order ID: {order_id}, Status: {order_status}, "
                 f"Client ID: {client_order_id}, Filled: {filled_qty} @ {filled_price}, Remaining: {remaining_qty}"
             )
-            
+
             # Check if this is a test order
             is_test_order = client_order_id and "no-fill-test" in client_order_id
             if is_test_order:
                 logger.info(f"[NO-FILL-TEST] [WebSocket EVENT] Test order update: {order_id} -> {order_status}")
-            
+
             # Update stream status in trading state for reconciliation
             if order_id:
                 import time
@@ -209,7 +210,7 @@ class EnhancedTradingSystem:
                     logger.info(f"[WebSocket EVENT] Order {order_id} reached terminal state: {order_status}")
                     self.trading_state.clear_active_order()
                     logger.info(f"[WebSocket EVENT] Cleared active order tracking for {order_id}")
-                    
+
                     if is_test_order:
                         logger.info(f"[NO-FILL-TEST] [WebSocket EVENT] Test order {order_id} completed with status: {order_status}")
 
@@ -225,7 +226,7 @@ class EnhancedTradingSystem:
                 }
                 await self.db_handler.log_trade_record(trade_record)
                 logger.info(f"[WebSocket EVENT] Trade record logged: {trade_record}")
-                
+
                 if is_test_order:
                     logger.warning(f"[NO-FILL-TEST] [WebSocket EVENT] UNEXPECTED: Test order {order_id} was filled! This should not happen.")
 
@@ -238,7 +239,7 @@ class EnhancedTradingSystem:
                 logger.info(
                     f"[WebSocket EVENT] Position updated: {old_position} -> {self.trading_state.current_position_qty} (change: {filled_qty})"
                 )
-                
+
                 if is_test_order:
                     logger.warning(f"[NO-FILL-TEST] [WebSocket EVENT] UNEXPECTED: Test order caused position change! Old: {old_position}, New: {self.trading_state.current_position_qty}")
 
@@ -330,7 +331,7 @@ class EnhancedTradingSystem:
         # Check if no-fill test mode is enabled
         no_fill_config = self.app_config.get('live_trading', {}).get('no_fill_test_mode', {})
         is_test_mode = no_fill_config.get('enabled', False)
-        
+
         strategy_name = "mean_reversion" # dynamically get the currently running strategy
         strategy_config = self.app_config['strategies'][strategy_name]
         order_settings = strategy_config.get('order_settings', {})
@@ -379,7 +380,7 @@ class EnhancedTradingSystem:
                 else:  # sell
                     # For sell orders, place limit price 10% above market to ensure no fill
                     order_params['limit_price'] = round(current_price * (1 + price_offset), 2)
-                    
+
                 logger.info(f"[NO-FILL-TEST] Submitting {order_params['side']} limit order for {order_params['qty']} @ {order_params['limit_price']:.2f} with key {order_params['client_order_id']}")
                 logger.info(f"[NO-FILL-TEST] Current market price: {current_price:.2f}, Offset: {price_offset*100:.1f}%")
             else:
@@ -404,7 +405,7 @@ class EnhancedTradingSystem:
                 asyncio.create_task(self._auto_cancel_test_order(order_result.id, test_duration))
             else:
                 logger.info(f"Order placed successfully: {order_result.id}")
-            
+
             self.trading_state.set_active_order(order_result.id, order_result.client_order_id)
         else:
             logger.error(f"Failed to place order with params: {order_params}")
@@ -568,10 +569,10 @@ class EnhancedTradingSystem:
                                 logger.warning(
                                     f"[RECONCILE] Cash mismatch detected! Stream state: ${self.trading_state.last_known_cash:.2f}, REST API state: ${float(refreshed_account_info.cash):.2f}"
                                 )
-                                logger.info(f"[RECONCILE] Trusting REST API cash value and updating internal state")
+                                logger.info("[RECONCILE] Trusting REST API cash value and updating internal state")
                             else:
                                 logger.info(f"[RECONCILE] Cash values consistent: ${float(refreshed_account_info.cash):.2f}")
-                                
+
                             self.trading_state.update_cash_and_value(
                                 float(refreshed_account_info.cash),
                                 float(refreshed_account_info.portfolio_value),
@@ -588,7 +589,7 @@ class EnhancedTradingSystem:
                             refreshed_qty = float(refreshed_position_info.qty)
 
                         logger.info(f"[RECONCILE] Position check for {self.trading_state.symbol}: Stream state: {self.trading_state.current_position_qty}, REST API state: {refreshed_qty}")
-                        
+
                         if (
                             abs(
                                 refreshed_qty
@@ -599,48 +600,48 @@ class EnhancedTradingSystem:
                             logger.warning(
                                 f"[RECONCILE] Position mismatch detected! Stream state: {self.trading_state.current_position_qty}, REST API state: {refreshed_qty}"
                             )
-                            logger.warning(f"[RECONCILE] Trusting REST API state and syncing internal position")
+                            logger.warning("[RECONCILE] Trusting REST API state and syncing internal position")
                             self.trading_state.update_position(refreshed_qty)
                             logger.info(
                                 f"[RECONCILE] Position synchronized to REST API: {self.trading_state.symbol} -> {refreshed_qty}"
                             )
                         else:
                             logger.info(f"[RECONCILE] Position values consistent for {self.trading_state.symbol}: {refreshed_qty}")
-                            
+
                         # Enhanced order status reconciliation
                         if self.trading_state.active_order_id:
                             logger.info(f"[RECONCILE] Checking active order status: {self.trading_state.active_order_id}")
-                            
+
                             # Get the official state from the REST API
                             refreshed_order_info = self.broker_handler.get_order_status(self.trading_state.active_order_id)
                             rest_status = refreshed_order_info.status if refreshed_order_info else "not_found"
-                            
+
                             # Get the last known state from the WebSocket stream
                             stream_status = self.trading_state.last_known_stream_status or "unknown"
-                            
+
                             logger.info(f"[RECONCILE] Order {self.trading_state.active_order_id} status comparison - Stream: '{stream_status}', REST API: '{rest_status}'")
-                            
+
                             if stream_status != rest_status:
                                 logger.warning(f"[RECONCILE] Order status mismatch detected! Stream state: '{stream_status}', REST API state: '{rest_status}'")
                                 logger.warning(f"[RECONCILE] Trusting REST API state: '{rest_status}'. Updating internal state.")
-                                
+
                                 # Update the stream status to match REST API
                                 import time
                                 self.trading_state.update_stream_order_status(self.trading_state.active_order_id, rest_status, time.time())
-                                
+
                                 # Handle terminal states
                                 if rest_status in ["filled", "canceled", "expired", "rejected"]:
                                     logger.info(f"[RECONCILE] Order {self.trading_state.active_order_id} is in terminal state '{rest_status}', clearing active order tracking")
                                     self.trading_state.clear_active_order()
-                                    
+
                             else:
                                 logger.info(f"[RECONCILE] Order status consistent: '{rest_status}'. No action needed.")
                         else:
-                            logger.debug(f"[RECONCILE] No active order to reconcile")
+                            logger.debug("[RECONCILE] No active order to reconcile")
 
                         last_account_refresh_time = current_time
-                        logger.info(f"[RECONCILE] Periodic reconciliation completed successfully")
-                        
+                        logger.info("[RECONCILE] Periodic reconciliation completed successfully")
+
                     except Exception as refresh_err:
                         logger.error(
                             f"[RECONCILE] Error during periodic reconciliation: {refresh_err}",
@@ -755,7 +756,7 @@ class EnhancedTradingSystem:
         This is primarily for demonstration and testing purposes.
         """
         logger.info("[VERIFY] Performing one-shot account and position refresh.")
-        
+
         # 1. Refresh account info (cash, portfolio value)
         refreshed_account_info = self.broker_handler.get_account_info()
         if refreshed_account_info:
@@ -763,13 +764,13 @@ class EnhancedTradingSystem:
                 float(refreshed_account_info.cash),
                 float(refreshed_account_info.portfolio_value),
             )
-        
+
         # 2. Refresh position info and check for discrepancies
         position = self.broker_handler.get_position(self.trading_state.symbol)
         api_qty = float(getattr(position, "qty", 0.0)) if position else 0.0
-        
+
         stream_qty = self.trading_state.current_position_qty
-        
+
         if abs(api_qty - stream_qty) > 0.01:
             logger.warning(
                 f"[VERIFY] Position mismatch for {self.trading_state.symbol}: "
@@ -782,7 +783,7 @@ class EnhancedTradingSystem:
                 f"[VERIFY] State consistent for {self.trading_state.symbol}: "
                 f"Stream and REST API both show position of {api_qty}."
             )
-        
+
         logger.info("[VERIFY] Verification pass complete.")
 
     async def stop_trading(self):

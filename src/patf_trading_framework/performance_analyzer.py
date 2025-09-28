@@ -2,7 +2,6 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,7 +43,7 @@ class PerformanceAnalyzer:
         self.cash = initial_capital
         # --- OPTIMIZATION: Store the latest known market prices ---
         self.latest_market_prices: dict[str, float] = {}
-        self.benchmark_returns: Optional[pd.Series] = None
+        self.benchmark_returns: pd.Series | None = None
         self.benchmark_name: str = "Benchmark"
 
         logger.info(

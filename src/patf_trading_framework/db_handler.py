@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 from sqlalchemy import Column, DateTime, Float, String, create_engine, text
@@ -48,9 +47,9 @@ class DBHandler:
         self.backend = db_config.get("backend", "postgresql").lower()
         self.engine = None
         self.Session = None
-        self.db_url: Optional[str] = None
-        self.storage_dir: Optional[Path] = None
-        self.sqlite_path: Optional[Path] = None
+        self.db_url: str | None = None
+        self.storage_dir: Path | None = None
+        self.sqlite_path: Path | None = None
 
         if self.backend in {"postgres", "postgresql"}:
             self.db_url = (
@@ -454,8 +453,8 @@ class DBHandler:
     def _postprocess_market_df(
         self,
         df: pd.DataFrame,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> pd.DataFrame:
         if df.empty:
             return df
@@ -517,7 +516,7 @@ class DBHandler:
         df.to_parquet(path, index=False)
 
 
-__all__: List[str] = [
+__all__: list[str] = [
     "DBHandler",
     "MarketData",
     "TradeLog",

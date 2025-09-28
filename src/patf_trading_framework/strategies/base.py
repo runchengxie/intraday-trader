@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import backtrader as bt
 import pytz
 from backtrader.utils.date import num2date
-
 
 STATUS_NAME = {
     bt.Order.Created: "created",
@@ -50,15 +48,7 @@ class OrderLoggerMixin:
 
         if cur == bt.Order.Completed:
             self.log(
-                "{dt}, ORDER {ref} {name}, Price: {price:.2f}, Size: {size}, Value: {value:.2f}, Comm: {comm:.2f}".format(
-                    dt=dt,
-                    ref=order.ref,
-                    name=name,
-                    price=order.executed.price,
-                    size=order.executed.size,
-                    value=order.executed.value,
-                    comm=order.executed.comm,
-                )
+                f"{dt}, ORDER {order.ref} {name}, Price: {order.executed.price:.2f}, Size: {order.executed.size}, Value: {order.executed.value:.2f}, Comm: {order.executed.comm:.2f}"
             )
         elif cur in (bt.Order.Canceled, bt.Order.Expired, bt.Order.Margin, bt.Order.Rejected):
             self.log(f"{dt}, ORDER {order.ref} {name}")
@@ -146,8 +136,8 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
         direction: int,
         *,
         order_type: str = "market",
-        limit_offset_pct: Optional[float] = None,
-        size: Optional[float] = None,
+        limit_offset_pct: float | None = None,
+        size: float | None = None,
     ):
         """Place either a market or limit order in the requested direction."""
 

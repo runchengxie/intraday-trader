@@ -50,17 +50,17 @@ def broker_handler():
         # --- Setup ---
         logger.info("Setting up BrokerAPIHandler for integration tests...")
         handler = BrokerAPIHandler()
-        
+
         # --- Pre-test Cleanup ---
         logger.info("Performing pre-test cleanup: Cancelling all existing open orders...")
         handler.cancel_all_orders()
         time.sleep(3) # Allow time for cancellations to be processed by Alpaca
-        
+
         yield handler
 
     except ValueError as e:
         pytest.fail(f"FATAL: Failed to initialize BrokerAPIHandler. Check .env file and API keys. Error: {e}")
-    
+
     finally:
         # --- Post-test Teardown ---
         if handler:
@@ -75,7 +75,7 @@ async def test_connection_and_account_info(broker_handler):
     """Tests the basic API connection by fetching account information."""
     logger.info("\n--- [Test Case: Get Account Info] ---")
     account_info = broker_handler.get_account_info()
-    
+
     assert account_info is not None, "Failed to get account info. Check API keys and connection."
     assert hasattr(account_info, "id"), "Account info is missing 'id' attribute."
     assert account_info.status == "ACTIVE", f"Account status is '{account_info.status}', not 'ACTIVE'."
@@ -106,7 +106,7 @@ async def test_full_order_cycle(broker_handler):
 
     # Use a unique client_order_id for idempotency
     client_order_id = f"test_cycle_{uuid.uuid4()}"
-    
+
     order = broker_handler.place_order(
         symbol=symbol_to_test, qty=1, side="buy", order_type="limit",
         time_in_force="day", limit_price=test_limit_price, client_order_id=client_order_id
@@ -143,7 +143,7 @@ async def test_list_positions(broker_handler):
     logger.info("\n--- [Test Case: List Positions] ---")
     positions = broker_handler.list_positions()
     assert positions is not None, "list_positions() should return a list or empty list, not None."
-    
+
     if not positions:
         logger.info("No positions currently held (as expected for a clean test account).")
     else:
@@ -161,7 +161,7 @@ async def test_websocket_stream_receives_data(broker_handler):
     """
     symbol_to_stream = "AAPL"
     logger.info(f"\n--- [Test Case: WebSocket Stream for {symbol_to_stream}] ---")
-    
+
     # Arrange: Create a queue to hold messages received from the stream
     received_updates = asyncio.Queue()
 
@@ -176,7 +176,7 @@ async def test_websocket_stream_receives_data(broker_handler):
         subscribe_trades=True,
         subscribe_updates=False # Don't need order updates for this test
     )
-    
+
     stream_task = asyncio.create_task(broker_handler.start_streaming())
     logger.info("WebSocket stream started in background task. Waiting for data...")
 
@@ -195,7 +195,7 @@ async def test_websocket_stream_receives_data(broker_handler):
             await stream_task
         except asyncio.CancelledError:
             pass # This is expected
-    
+
     # Assert: Check if we received at least one message
     assert not received_updates.empty() or 'first_message' in locals()
     logger.info("WebSocket stream test successful.")

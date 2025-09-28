@@ -145,7 +145,7 @@ class TradingState:
         self.positions = {symbol: 0.0}
         self.cash = 0.0
         self.latest_prices = {}
-        
+
         # Enhanced order tracking for reconciliation
         self.last_known_stream_status: str | None = None
         self.active_order_client_id: str | None = None
@@ -187,18 +187,18 @@ class TradingState:
         self.active_order_client_id = client_order_id
         # Reset stream status when setting new order
         self.last_known_stream_status = None
-        
+
     def update_stream_order_status(self, order_id: str, status: str, timestamp: float = None):
         """Update the last known order status from WebSocket stream"""
         import time
         if timestamp is None:
             timestamp = time.time()
-            
+
         if order_id == self.active_order_id:
             old_status = self.last_known_stream_status
             self.last_known_stream_status = status
             self.last_stream_update_time = timestamp
-            
+
             # Track status history for debugging
             self.order_status_history.append({
                 'timestamp': timestamp,
@@ -207,9 +207,9 @@ class TradingState:
                 'new_status': status,
                 'source': 'websocket'
             })
-            
+
             logger.debug(f"Updated stream status for order {order_id}: {old_status} -> {status}")
-            
+
     def clear_active_order(self):
         """Clear active order tracking when order is completed"""
         logger.info(f"Clearing active order tracking for {self.active_order_id}")

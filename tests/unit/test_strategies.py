@@ -4,9 +4,9 @@ pd = pytest.importorskip("pandas")
 bt = pytest.importorskip("backtrader")
 
 from patf_trading_framework.strategies import (
+    CustomRatioStrategy,
     EMACrossoverStrategy,
     MeanReversionZScoreStrategy,
-    CustomRatioStrategy,
 )
 
 
@@ -18,21 +18,21 @@ def cerebro_setup():
     """
     def _run_strategy(strategy_class, data_df, params={}):
         cerebro = bt.Cerebro(stdstats=False) # Disable standard observers for cleaner output
-        
+
         # Ensure the DataFrame index is datetime
         data_df.index = pd.to_datetime(data_df.index)
-        
+
         data_feed = bt.feeds.PandasData(dataname=data_df)
         cerebro.adddata(data_feed)
         cerebro.addstrategy(strategy_class, **params)
-        
+
         cerebro.broker.set_cash(100000)
         # Use Cheat-on-Close to ensure orders are executed on the same bar a signal is generated
-        cerebro.broker.set_coc(True) 
-        
+        cerebro.broker.set_coc(True)
+
         # Add an analyzer to programmatically check the results
         cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trades')
-        
+
         # Run the backtest
         results = cerebro.run()
         return results[0] # Return the strategy instance with analyzers
@@ -45,7 +45,7 @@ def test_ema_crossover_executes_buy_on_golden_cross_with_high_adx(cerebro_setup)
     """Verify a BUY order is placed on a golden cross when ADX is high."""
     # Arrange: Create data that produces a clear EMA crossover and a high ADX
     # Prices trend strongly upwards to generate a high ADX value.
-    prices = [100 + i for i in range(30)] 
+    prices = [100 + i for i in range(30)]
     data = {
         'open': [p - 1 for p in prices], 'high': [p + 1 for p in prices],
         'low': [p - 2 for p in prices], 'close': prices,
@@ -58,7 +58,7 @@ def test_ema_crossover_executes_buy_on_golden_cross_with_high_adx(cerebro_setup)
     # Act
     strat = cerebro_setup(EMACrossoverStrategy, df, params)
     analysis = strat.analyzers.trades.get_analysis()
-    
+
     # Assert
     assert analysis.total.total > 0
     assert analysis.won.total == 1 # This single trade should be profitable or open
@@ -102,7 +102,7 @@ def test_mean_reversion_executes_buy_on_low_zscore(cerebro_setup):
     # Act
     strat = cerebro_setup(MeanReversionZScoreStrategy, df, params)
     analysis = strat.analyzers.trades.get_analysis()
-    
+
     # Assert
     assert analysis.total.total > 0
     assert strat.position.size > 0 # Should have an open long position
@@ -111,7 +111,7 @@ def test_mean_reversion_executes_buy_on_low_zscore(cerebro_setup):
 def test_mean_reversion_closes_long_position_on_revert(cerebro_setup):
     """Verify a long position is closed when Z-Score reverts to the exit threshold."""
     # Arrange: Data drops to trigger a buy, then reverts to the mean (100).
-    prices = [100] * 25 + [90] + [100, 101] 
+    prices = [100] * 25 + [90] + [100, 101]
     data = {
         'open': prices, 'high': prices, 'low': prices, 'close': prices,
         'volume': [1000] * 28, 'openinterest': [0] * 28
@@ -143,7 +143,7 @@ def test_mean_reversion_uses_filtered_price_when_enabled(cerebro_setup):
     # Act
     strat = cerebro_setup(MeanReversionZScoreStrategy, df, params)
     analysis = strat.analyzers.trades.get_analysis()
-    
+
     # Assert: A trade should be made based on filtered_close, even though 'close' never moved.
     assert analysis.total.total > 0
     assert strat.position.size > 0
@@ -155,25 +155,25 @@ def test_mean_reversion_submits_limit_order(cerebro_setup):
     prices = [100] * 25 + [90, 91]
     data = {'close': prices, 'open': prices, 'high': prices, 'low': prices, 'volume': [1000]*27, 'openinterest': [0]*27}
     df = pd.DataFrame(data, index=pd.date_range(start='2023-01-01', periods=27))
-    
+
     # Configure for limit order with a specific offset.
     params = {
-        'order_type': 'limit', 
+        'order_type': 'limit',
         'limit_price_offset_pct': 0.001, # 0.1%
-        'zscore_period': 20, 
+        'zscore_period': 20,
         'zscore_lower': -2.0
     }
 
     # Act
     strat = cerebro_setup(MeanReversionZScoreStrategy, df, params)
-    
+
     # Assert
     # The order will be created but might not fill if the price moves away.
     # The key is to check the *last order object* created by the strategy.
     assert strat.order is not None
     assert strat.order.isbuy()
     assert strat.order.exectype == bt.Order.Limit
-    
+
     # The signal is on the bar with price 90. Expected limit price = 90 * (1 + 0.001) = 90.09
     expected_limit_price = 90 * (1 + 0.001)
     assert strat.order.created.price == pytest.approx(expected_limit_price)

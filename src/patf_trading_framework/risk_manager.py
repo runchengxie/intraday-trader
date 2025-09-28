@@ -1,6 +1,7 @@
 import logging
 from collections import deque
 from datetime import datetime
+
 import numpy as np
 
 logger = logging.getLogger(__name__)

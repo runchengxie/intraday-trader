@@ -8,7 +8,6 @@ import pandas as pd
 NY_TIMEZONE = "America/New_York"
 from .db_handler import DBHandler
 
-
 # --- Logging Setup ---
 logger = logging.getLogger(__name__)
 

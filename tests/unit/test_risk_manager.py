@@ -1,4 +1,3 @@
-from datetime import datetime
 
 import pytest
 
@@ -37,17 +36,17 @@ def populated_risk_manager(risk_manager):
     # Add a few outliers to make VaR more meaningful
     returns[5] = -0.04 # 4% drop
     returns[15] = 0.035 # 3.5% gain
-    
+
     for r in returns:
         risk_manager.returns_history.append(r)
-        
+
     # Also populate price and volume history for other checks
     prices = 100 * np.exp(np.cumsum(returns))
     for p in prices:
         risk_manager.price_history.append(p)
     for _ in range(50):
         risk_manager.volume_history.append(10000)
-        
+
     return risk_manager
 
 
@@ -101,7 +100,7 @@ def test_calculate_var_parametric(populated_risk_manager):
     std = np.std(returns_array)
     expected_var_return = norm.ppf(0.05, mean, std)
     expected_var_amount = abs(expected_var_return * portfolio_value)
-    
+
     assert result['method'] == 'parametric'
     assert result['var'] == pytest.approx(expected_var_amount)
 
@@ -192,11 +191,11 @@ def test_perform_risk_checks_price_jump(risk_manager):
     # Arrange: Add a base price
     risk_manager.price_history.append(100.0)
     risk_manager.returns_history.append(0.0) # Dummy previous return
-    
+
     # Act: Trigger a price jump greater than the 10% threshold
     # The return from 100 to 111 is +11%
     alerts = risk_manager.update_market_data(price=111.0, volume=1000)
-    
+
     # Assert
     assert alerts['price_jump_alert'] is True
     assert "Significant price jump" in alerts['messages'][0]

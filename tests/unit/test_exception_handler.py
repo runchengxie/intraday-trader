@@ -85,18 +85,18 @@ def test_circuit_breaker_resets_after_recovery():
     breaker = CircuitBreaker(failure_threshold=1, recovery_timeout=0.01)
     failing_func = MagicMock(side_effect=ValueError("Failed"))
     succeeding_func = MagicMock(return_value="Success")
-    
+
     # Trip the breaker
     with pytest.raises(ValueError):
         breaker.call(failing_func)
     assert breaker.state == "OPEN"
-    
+
     # Wait for recovery timeout
     time.sleep(0.02)
-    
+
     # Call with a succeeding function. It should now be HALF_OPEN, then move to CLOSED
     result = breaker.call(succeeding_func)
-    
+
     assert result == "Success"
     assert breaker.state == "CLOSED"
     assert breaker.failure_count == 0
@@ -110,10 +110,10 @@ def test_handle_exception_creates_record(handler):
         _ = 1 / 0
     except ZeroDivisionError as e:
         handler.handle_exception(e, ErrorCategory.SYSTEM, ErrorSeverity.CRITICAL)
-        
+
     assert len(handler.error_records) == 1
     record = handler.error_records[0]
-    
+
     assert record.error_type == "ZeroDivisionError"
     assert record.category == ErrorCategory.SYSTEM
     assert record.severity == ErrorSeverity.CRITICAL
@@ -124,7 +124,7 @@ def test_emergency_stop_triggered_on_critical(handler):
     """Verify the emergency stop flag is set only for CRITICAL errors."""
     handler.handle_exception(ValueError("High error"), ErrorCategory.API, ErrorSeverity.HIGH)
     assert handler.emergency_stop_triggered is False
-    
+
     handler.handle_exception(ValueError("Critical error"), ErrorCategory.SYSTEM, ErrorSeverity.CRITICAL)
     assert handler.emergency_stop_triggered is True
 
@@ -133,13 +133,13 @@ def test_error_callback_is_executed(handler):
     """Verify that a registered callback function is called on the correct error category."""
     callback_mock = MagicMock()
     handler.register_error_callback(ErrorCategory.NETWORK, callback_mock)
-    
+
     # Handle a network error
     handler.handle_exception(ConnectionError("Timeout"), ErrorCategory.NETWORK, ErrorSeverity.MEDIUM)
-    
+
     # Handle a different category of error
     handler.handle_exception(ValueError("Bad param"), ErrorCategory.API, ErrorSeverity.LOW)
-    
+
     # The callback should have been called exactly once with the network error record
     callback_mock.assert_called_once()
     assert callback_mock.call_args[0][0].category == ErrorCategory.NETWORK
@@ -185,7 +185,7 @@ def test_handle_exceptions_decorator_no_retry(handler):
     """Verify the decorator with retry=False returns a default value on failure."""
     trader = MockTrader(handler)
     result = trader.fail_once_no_retry()
-    
+
     assert result == "Default"
     # One error should be logged
     assert len(handler.error_records) == 1
@@ -199,9 +199,9 @@ def test_get_error_statistics(handler):
     handler.handle_exception(ConnectionError(), ErrorCategory.NETWORK, ErrorSeverity.MEDIUM)
     handler.handle_exception(ValueError(), ErrorCategory.API, ErrorSeverity.LOW)
     handler.handle_exception(ValueError(), ErrorCategory.API, ErrorSeverity.LOW)
-    
+
     stats = handler.get_error_statistics()
-    
+
     assert stats['total_errors'] == 3
     assert stats['category_breakdown']['network']['count'] == 1
     assert stats['category_breakdown']['api']['count'] == 2
@@ -212,13 +212,13 @@ def test_get_error_statistics(handler):
 def test_export_error_log(handler, tmp_path):
     """Verify that an error log can be exported to a JSON file."""
     handler.handle_exception(TypeError("Bad type"), ErrorCategory.STRATEGY, ErrorSeverity.HIGH)
-    
+
     file_path = tmp_path / "error_log.json"
     handler.export_error_log(str(file_path))
-    
+
     assert file_path.exists()
     with open(file_path) as f:
         data = json.load(f)
-    
+
     assert len(data) == 1
     assert data[0]['error_type'] == 'TypeError'
