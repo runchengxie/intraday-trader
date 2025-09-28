@@ -12,6 +12,11 @@ pytest.importorskip("alpaca_trade_api")
 from intraday_trader_air.broker_handler import BrokerAPIHandler
 
 REQUIRED_ENV_VARS = ["APCA_API_KEY_ID", "APCA_API_SECRET_KEY"]
+RUN_LIVE_STREAM_TEST = os.getenv("RUN_ALPACA_STREAM_TEST", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
@@ -194,6 +199,10 @@ async def test_websocket_stream_receives_data(broker_handler):
     Tests the most complex part of the handler: the async WebSocket stream.
     It verifies that the handler can connect, subscribe, and receive data.
     """
+    if not RUN_LIVE_STREAM_TEST:
+        pytest.skip(
+            "Set RUN_ALPACA_STREAM_TEST=1 to enable the live WebSocket stream integration test."
+        )
     symbol_to_stream = "AAPL"
     logger.info(f"\n--- [Test Case: WebSocket Stream for {symbol_to_stream}] ---")
 

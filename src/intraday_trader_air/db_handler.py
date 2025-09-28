@@ -53,6 +53,9 @@ class DBHandler:
         self.storage_dir: Path | None = None
         self.sqlite_path: Path | None = None
 
+        self._sqlite_supports_upsert: bool | None = None
+        self._sqlite_version: str | None = None
+
         if self.backend in {"postgres", "postgresql"}:
             self.db_url = (
                 f"postgresql+psycopg2://{db_config['user']}:{db_config['password']}"
@@ -75,6 +78,7 @@ class DBHandler:
                 connect_args={"check_same_thread": False},
             )
             self.Session = sessionmaker(bind=self.engine)
+            self._detect_sqlite_capabilities()
         elif self.backend == "parquet":
             storage_path = db_config.get("path") or Path("output") / "cache"
             storage_path = Path(storage_path).expanduser()
@@ -253,20 +257,28 @@ class DBHandler:
         )
 
         if self.backend == "sqlite":
-            upsert_statement = text(
-                f"""
-                INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
-                SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
-                ON CONFLICT(timestamp, symbol) DO UPDATE SET
-                    open=excluded.open,
-                    high=excluded.high,
-                    low=excluded.low,
-                    close=excluded.close,
-                    volume=excluded.volume,
-                    trade_count=excluded.trade_count,
-                    vwap=excluded.vwap;
-                """
-            )
+            if self._sqlite_supports_upsert:
+                upsert_statement = text(
+                    f"""
+                    INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+                    SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
+                    ON CONFLICT(timestamp, symbol) DO UPDATE SET
+                        open=excluded.open,
+                        high=excluded.high,
+                        low=excluded.low,
+                        close=excluded.close,
+                        volume=excluded.volume,
+                        trade_count=excluded.trade_count,
+                        vwap=excluded.vwap;
+                    """
+                )
+            else:
+                upsert_statement = text(
+                    f"""
+                    INSERT OR REPLACE INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+                    SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name};
+                    """
+                )
         else:
             upsert_statement = text(
                 f"""
@@ -298,6 +310,38 @@ class DBHandler:
             symbol,
             rows_inserted,
         )
+
+    def _detect_sqlite_capabilities(self):
+        """Detect whether the runtime SQLite supports native upsert syntax."""
+        if self.backend != "sqlite" or not self.engine:
+            return
+
+        try:
+            with self.engine.connect() as conn:
+                version = conn.execute(text("select sqlite_version();")).scalar()
+        except Exception as exc:  # pragma: no cover - defensive logging path
+            logger.warning(
+                "Could not determine sqlite_version(): falling back to INSERT OR REPLACE. Error: %s",
+                exc,
+            )
+            self._sqlite_supports_upsert = False
+            return
+
+        if isinstance(version, str):
+            self._sqlite_version = version
+            parts = [int(p) for p in version.split(".") if p.isdigit()][:3]
+            while len(parts) < 3:
+                parts.append(0)
+            self._sqlite_supports_upsert = tuple(parts) >= (3, 24, 0)
+        else:
+            self._sqlite_version = str(version)
+            self._sqlite_supports_upsert = False
+
+        if not self._sqlite_supports_upsert:
+            logger.info(
+                "SQLite %s lacks native DO UPDATE support; using INSERT OR REPLACE for market_data upserts.",
+                self._sqlite_version or "unknown version",
+            )
 
     def _save_market_data_parquet(self, df: pd.DataFrame):
         path = self._parquet_table_path("market_data")
