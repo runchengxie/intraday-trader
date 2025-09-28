@@ -1,5 +1,7 @@
 # January 2025 - Final Project
 
+> **课堂参考**：以下内容保留原课程作业的考试说明，仅作为历史背景供项目参与者参考，并不代表当前仓库的项目规范或贡献要求。
+
 > [!NOTE]
 >
 > You are about to start the Certificate in Quantitative Finance (CQF) exam. By accessing the exam materials, you acknowledge and agree to the CQF Terms of Use (<https://www.fitch.group/terms-of-use/> en) and the following terms:

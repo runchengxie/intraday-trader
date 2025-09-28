@@ -1,5 +1,7 @@
 # Algorithmic Trading for Reversion and Trend-Following v2025
 
+> **课堂参考**：本文档系课堂原始项目要求，现存于仓库中仅供灵感参考；落地实现与优先级以主项目规划为准。
+
 Algorithmic trading in HFT space is concerned with how to optimally run the core strategies focusing on execution. The issues of order types as allowed by broker/exchange, slippage, incorrect messages from a broker, and own high-frequency data storage (15 Min and less) – can disturb any strategy, and you address them in Part III (last but not the least). However, this is a quantitative study. With attention to mathematics and application detail (e.g., sample period/time window experiment) implement at least two kinds of (a) trend-following strategy with several indicators of your choice AND (b) reversion strategy with an indicator of your choice. This is Part I and you can do it as a historic back-test.
 
 In Parts II and III extend the strategies from back-testing to some degree of live-testing to test simple scripts with Broker API of your choice. However, if specific Broker API/language learning curve is steep, you can limit the scope – Part II covers more detail. Real-time trading relies on loops which check for buy/sell signal, and to improve the performance more optimized languages than Python are used in the industry, e.g. GoLang.

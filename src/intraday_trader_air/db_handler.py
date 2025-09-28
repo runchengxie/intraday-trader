@@ -229,11 +229,11 @@ class DBHandler:
     def _save_market_data_parquet(self, df: pd.DataFrame):
         path = self._parquet_table_path("market_data")
         df = df.reset_index()
-        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         if path.exists():
             existing = pd.read_parquet(path)
             existing["timestamp"] = pd.to_datetime(
-                existing["timestamp"], utc=True, errors="coerce"
+                existing["timestamp"], errors="coerce"
             )
             combined = pd.concat([existing, df], ignore_index=True)
             combined.drop_duplicates(subset=["timestamp", "symbol"], keep="last", inplace=True)
@@ -460,12 +460,12 @@ class DBHandler:
             return df
 
         if "timestamp" in df.columns:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
             df.set_index("timestamp", inplace=True)
 
         if not df.empty:
             if df.index.tz is None:
-                df.index = df.index.tz_localize("UTC").tz_convert("America/New_York")
+                df.index = df.index.tz_localize("America/New_York")
             else:
                 df.index = df.index.tz_convert("America/New_York")
 
@@ -478,19 +478,16 @@ class DBHandler:
                 except Exception:
                     pass
 
-            for col in ["open", "high", "low", "volume"]:
-                if col in df.columns and pd.api.types.is_float_dtype(df[col]):
-                    s = df[col].dropna()
-                    if not s.empty and ((s % 1) == 0).all():
-                        df[col] = df[col].astype("int64")
+            # Preserve original numeric dtypes to avoid surprises when comparing
+            # against cached DataFrames in tests or downstream analytics.
 
         if start_date or end_date:
             start_ts = pd.Timestamp(start_date) if start_date else None
             end_ts = pd.Timestamp(end_date) if end_date else None
             if start_ts is not None and start_ts.tzinfo is None:
-                start_ts = start_ts.tz_localize("UTC").tz_convert("America/New_York")
+                start_ts = start_ts.tz_localize("America/New_York")
             if end_ts is not None and end_ts.tzinfo is None:
-                end_ts = end_ts.tz_localize("UTC").tz_convert("America/New_York")
+                end_ts = end_ts.tz_localize("America/New_York")
             if start_ts:
                 df = df[df.index >= start_ts]
             if end_ts:
