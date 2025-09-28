@@ -78,9 +78,17 @@ flowchart LR
 
 ## 快速开始
 
-你可以选择使用 Docker（推荐）或本地 Python 环境来运行项目。
+你可以选择使用 Docker（可选，用于可复现/部署）或本地 Python 环境来运行项目。
 
-### 方式一：Docker（推荐）
+| 场景 | 推荐方式 | 说明 |
+| --- | --- | --- |
+| 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .` 后即可使用 CLI，启动速度最快。
+| 需要 TimescaleDB、CI 任务或课堂验收 | Docker（`--profile live`） | 容器一次性拉起交易服务与 TimescaleDB，环境完全可复现。
+| 只想调试数据库 | Docker（`--profile db`） | 单独启动 TimescaleDB，供本地脚本或 BI 工具连接。
+
+下面分别介绍两种方式的具体步骤，同时提供 `Makefile` 快捷命令供选择。
+
+### 方式一：Docker（按需，可复现/部署用）
 
 1. **克隆仓库**
    ```bash
@@ -102,9 +110,11 @@ flowchart LR
 
 3. **启动服务**
    ```bash
-   docker-compose up --build
+   # 等价命令：make docker-live
+   docker compose --profile live up trading-bot
    ```
-   该命令会构建交易机器人镜像、拉取 TimescaleDB 并按依赖顺序启动。按 `CTRL+C` 可停止服务。
+   `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。
+   使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
 
 ### 方式二：本地 Python 环境
 
@@ -140,14 +150,28 @@ flowchart LR
    - 生成报表：`patf run-generate-report`
    - 启动纸上交易：`patf run-live`
 
+## 常用命令速查
+
+项目根目录提供 `Makefile`，在安装完 CLI 后可以直接运行：
+
+```bash
+make help           # 查看所有常用命令
+make backtest       # 本地回测
+make update         # 更新数据缓存
+make docker-live    # 容器模式启动交易服务 + DB
+make docker-db      # 仅启动 TimescaleDB（容器）
+```
+
 ## 项目结构
 
 ```
 ├── src/patf_trading_framework/   # 核心代码（策略、数据、风险、实盘引擎）
+│   └── strategies/               # 策略包（含基类、注册表与具体策略实现）
 ├── tests/                        # 单元测试与集成测试
 ├── docs/                         # 文档与设计说明
 ├── notebooks/                    # Jupyter/研究用脚本
 ├── project_tools/                # 开发工具与辅助脚本
+├── Makefile                      # 本地与 Docker 工作流统一入口
 ├── config.yml                    # 全局配置（策略参数、数据源、数据库）
 ├── docker-compose.yml            # Docker 编排配置
 └── pyproject.toml                # 项目依赖与打包信息
