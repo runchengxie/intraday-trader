@@ -182,19 +182,19 @@ flowchart LR
 
      ```bash
      # 在不指定选项的时候将同时完成三个策略和benchmark的回测
-     intraday backtest run
+     backtest run
 
      # 只运行ema_crossover策略
-     intraday backtest run --strategy ema_crossover
+     backtest run --strategy ema_crossover
 
      # 只运行mean_reversion策略
-     intraday backtest run --strategy mean_reversion
+     backtest run --strategy mean_reversion
 
      # 只运行custom_ratio策略
-     intraday backtest run --strategy custom_ratio
+     backtest run --strategy custom_ratio
 
      # 指定同时跑多个策略的回测
-     intraday backtest run --strategy ema_crossover --strategy mean_reversion
+     backtest run --strategy ema_crossover --strategy mean_reversion
      ```
 
    * 若只想生成买入持有序列，可使用 `intraday backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
