@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import Column, DateTime, Float, Integer, String, create_engine, text
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -256,51 +256,9 @@ class DBHandler:
             temp_table_name, self.engine, if_exists="replace", index=False
         )
 
-        if self.backend == "sqlite":
-            if self._sqlite_supports_upsert:
-                upsert_statement = text(
-                    f"""
-                    INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
-                    SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
-                    ON CONFLICT(timestamp, symbol) DO UPDATE SET
-                        open=excluded.open,
-                        high=excluded.high,
-                        low=excluded.low,
-                        close=excluded.close,
-                        volume=excluded.volume,
-                        trade_count=excluded.trade_count,
-                        vwap=excluded.vwap;
-                    """
-                )
-            else:
-                upsert_statement = text(
-                    f"""
-                    INSERT OR REPLACE INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
-                    SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name};
-                    """
-                )
-        else:
-            upsert_statement = text(
-                f"""
-                INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
-                SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
-                ON CONFLICT (timestamp, symbol) DO UPDATE SET
-                    open = EXCLUDED.open,
-                    high = EXCLUDED.high,
-                    low = EXCLUDED.low,
-                    close = EXCLUDED.close,
-                    volume = EXCLUDED.volume,
-                    trade_count = EXCLUDED.trade_count,
-                    vwap = EXCLUDED.vwap;
-                """
-            )
-
         rows_inserted = 0
         try:
-            with self.engine.begin() as conn:
-                result = conn.execute(upsert_statement)
-                if result.rowcount and result.rowcount > 0:
-                    rows_inserted = result.rowcount
+            rows_inserted = self._execute_market_data_upsert(temp_table_name)
         finally:
             with self.engine.begin() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {temp_table_name};"))
@@ -342,6 +300,64 @@ class DBHandler:
                 "SQLite %s lacks native DO UPDATE support; using INSERT OR REPLACE for market_data upserts.",
                 self._sqlite_version or "unknown version",
             )
+
+    def _build_market_data_upsert(self, temp_table_name: str):
+        if self.backend == "sqlite" and not self._sqlite_supports_upsert:
+            return text(
+                f"""
+                INSERT OR REPLACE INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+                SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name};
+                """
+            )
+
+        return text(
+            f"""
+            INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+            SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
+            ON CONFLICT (timestamp, symbol) DO UPDATE SET
+                open = EXCLUDED.open,
+                high = EXCLUDED.high,
+                low = EXCLUDED.low,
+                close = EXCLUDED.close,
+                volume = EXCLUDED.volume,
+                trade_count = EXCLUDED.trade_count,
+                vwap = EXCLUDED.vwap;
+            """
+        )
+
+    def _execute_market_data_upsert(self, temp_table_name: str) -> int:
+        if not self.engine:
+            return 0
+
+        upsert_statement = self._build_market_data_upsert(temp_table_name)
+        try:
+            with self.engine.begin() as conn:
+                result = conn.execute(upsert_statement)
+        except OperationalError as exc:
+            if self._should_retry_sqlite_upsert(exc):
+                logger.warning(
+                    "SQLite does not support DO UPDATE syntax; retrying with "
+                    "INSERT OR REPLACE. Error: %s",
+                    exc,
+                )
+                self._sqlite_supports_upsert = False
+                upsert_statement = self._build_market_data_upsert(temp_table_name)
+                with self.engine.begin() as conn:
+                    result = conn.execute(upsert_statement)
+            else:
+                raise
+
+        if result.rowcount and result.rowcount > 0:
+            return result.rowcount
+        return 0
+
+    def _should_retry_sqlite_upsert(self, exc: OperationalError) -> bool:
+        if self.backend != "sqlite":
+            return False
+        if not self._sqlite_supports_upsert:
+            return False
+        message = str(exc).lower()
+        return "syntax error" in message and "do update" in message
 
     def _save_market_data_parquet(self, df: pd.DataFrame):
         path = self._parquet_table_path("market_data")
