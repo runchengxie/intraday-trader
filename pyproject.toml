@@ -41,21 +41,11 @@ dependencies = [
     "sqlalchemy>=2.0",
 ]
 
-# Optional dependencies: 'dev' includes all tools for development, testing, and code quality.
-# Use 'pip install -e .[dev]' to install.
 [project.optional-dependencies]
 test = [
     "pytest>=7.0",
     "pytest-asyncio", # For testing asyncio code
     "pytest-cov",
-]
-
-dev = [
-    "patf-trading-framework[test]", # Includes all test dependencies
-    "ruff",              # The all-in-one linter and formatter
-    "pre-commit",        # For automatically running checks before commits
-    "jupyterlab",        # For running and developing notebooks
-    "ipykernel",         # To make the project's venv available in Jupyter
 ]
 
 postgres = [
@@ -65,6 +55,17 @@ postgres = [
 dashboard = [
     "streamlit",
     "seaborn>=0.12",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+    "pre-commit",
+    "jupyterlab",
+    "ipykernel",
 ]
 
 # Define script entry points, allowing them to be run from the command line after installation.
