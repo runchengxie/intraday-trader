@@ -98,7 +98,9 @@ class MeanReversionZScoreStrategy(BaseStrategy):
 
     def enter_position(self, direction: int):
         order_type = self.p.order_type
-        limit_offset_pct = self.p.limit_price_offset_pct if order_type == "limit" else None
+        limit_offset_pct = (
+            self.p.limit_price_offset_pct if order_type == "limit" else None
+        )
         action = "BUY" if direction > 0 else "SELL"
         price = (
             self.compute_limit_price(direction, limit_offset_pct)

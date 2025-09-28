@@ -45,9 +45,7 @@ class CustomRatioStrategy(BaseStrategy):
     def enter_position(self, direction: int):
         action = "BUY" if direction > 0 else "SELL"
         ratio = self._current_ratio()
-        self.log(
-            f"{action} CREATE, Close: {self.dataclose[0]:.2f}, Ratio: {ratio:.4f}"
-        )
+        self.log(f"{action} CREATE, Close: {self.dataclose[0]:.2f}, Ratio: {ratio:.4f}")
         return self.place_entry(direction)
 
     def exit_position(self):

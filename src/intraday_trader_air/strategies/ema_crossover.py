@@ -34,11 +34,12 @@ class EMACrossoverStrategy(BaseStrategy):
         prev_long = self.ema_long[-1]
         prev_adx = self.adx.adx[-1]
         initializing_cross = (
-            (pd.isna(prev_short) or pd.isna(prev_long) or pd.isna(prev_adx))
-            and self.ema_short[0] > self.ema_long[0]
-        )
+            pd.isna(prev_short) or pd.isna(prev_long) or pd.isna(prev_adx)
+        ) and self.ema_short[0] > self.ema_long[0]
 
-        if (crossed_up or initializing_cross) and self.adx.adx[0] > self.p.adx_threshold:
+        if (crossed_up or initializing_cross) and self.adx.adx[
+            0
+        ] > self.p.adx_threshold:
             return 1
         return 0
 

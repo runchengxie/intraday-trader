@@ -139,7 +139,9 @@ class PerformanceAnalyzer:
 
         benchmark_series = series.dropna().sort_index()
         if benchmark_series.empty:
-            logger.warning("Benchmark series contains only NaNs after cleaning; skipping.")
+            logger.warning(
+                "Benchmark series contains only NaNs after cleaning; skipping."
+            )
             return
 
         if is_price_series:
@@ -155,7 +157,9 @@ class PerformanceAnalyzer:
 
         self.benchmark_returns = returns
         self.benchmark_name = name
-        logger.info("Benchmark series '%s' attached (%d observations).", name, len(returns))
+        logger.info(
+            "Benchmark series '%s' attached (%d observations).", name, len(returns)
+        )
 
     def calculate_relative_performance(self) -> dict:
         """Calculate relative performance metrics versus the attached benchmark."""
@@ -165,7 +169,10 @@ class PerformanceAnalyzer:
 
         portfolio_returns = self.calculate_returns()
         combined = pd.concat(
-            [portfolio_returns.rename("portfolio"), self.benchmark_returns.rename("benchmark")],
+            [
+                portfolio_returns.rename("portfolio"),
+                self.benchmark_returns.rename("benchmark"),
+            ],
             axis=1,
             join="inner",
         ).dropna()
@@ -453,9 +460,7 @@ class PerformanceAnalyzer:
 
                 elif positions_tracker[symbol]["quantity"] > 0:
                     cost_basis = positions_tracker[symbol]["cost_basis"]
-                    pnl = (
-                        trade.price - cost_basis
-                    ) * trade.quantity - trade.commission
+                    pnl = (trade.price - cost_basis) * trade.quantity - trade.commission
 
                     if pnl > 0:
                         profitable_trades.append(pnl)
@@ -621,9 +626,7 @@ class PerformanceAnalyzer:
                             "benchmark_total_return", 0.0
                         ),
                         "alpha": benchmark_report.get("alpha"),
-                        "information_ratio": benchmark_report.get(
-                            "information_ratio"
-                        ),
+                        "information_ratio": benchmark_report.get("information_ratio"),
                     }
                 )
 
@@ -675,9 +678,8 @@ class PerformanceAnalyzer:
                     "Benchmark curve could not be aligned for plotting; skipping overlay."
                 )
             else:
-                scaled_benchmark = (
-                    benchmark_curve
-                    * (self.initial_capital / benchmark_curve.dropna().iloc[0])
+                scaled_benchmark = benchmark_curve * (
+                    self.initial_capital / benchmark_curve.dropna().iloc[0]
                 )
                 axes[0, 0].plot(
                     scaled_benchmark.index,

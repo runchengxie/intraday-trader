@@ -160,7 +160,9 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     try:
         import yaml  # type: ignore
     except ImportError as exc:  # pragma: no cover - environment guard
-        raise ConfigurationError("PyYAML is required to load configuration files") from exc
+        raise ConfigurationError(
+            "PyYAML is required to load configuration files"
+        ) from exc
 
     try:
         raw = path.read_text(encoding="utf-8")
@@ -209,7 +211,9 @@ def _validate_paths_config(paths: Mapping[str, Any]) -> PathsConfig:
 def _validate_logging_config(config: Mapping[str, Any]) -> LoggingConfig:
     return LoggingConfig(
         level=str(config.get("level", "INFO")).upper(),
-        fmt=config.get("format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"),
+        fmt=config.get(
+            "format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        ),
         datefmt=config.get("datefmt", "%Y-%m-%d %H:%M:%S"),
     )
 
@@ -283,7 +287,9 @@ def load_app_config(path: Path) -> AppConfig:
         strategies_config = _validate_strategies_config(data.get("strategies", {}))
         database_config = _validate_database_config(data.get("database"))
     except KeyError as exc:
-        raise ConfigurationError(f"Missing required configuration section: {exc.args[0]}")
+        raise ConfigurationError(
+            f"Missing required configuration section: {exc.args[0]}"
+        )
 
     live_trading = data.get("live_trading")
 
@@ -297,4 +303,3 @@ def load_app_config(path: Path) -> AppConfig:
         database=database_config,
         live_trading=live_trading,
     )
-

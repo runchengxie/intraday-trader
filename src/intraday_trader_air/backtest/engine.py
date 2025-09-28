@@ -117,10 +117,14 @@ def run_backtest(request: BacktestRequest) -> tuple[bt.Cerebro, dict[str, Any]] 
     transactions = strat.analyzers.transactions.get_analysis()
 
     return_values = np.array(list(timereturns.values()), dtype=float)
-    var_95 = float(np.percentile(return_values, 5)) if return_values.size else float("nan")
+    var_95 = (
+        float(np.percentile(return_values, 5)) if return_values.size else float("nan")
+    )
     if return_values.size:
         cvar_mask = return_values <= var_95
-        cvar_95 = float(return_values[cvar_mask].mean()) if cvar_mask.any() else float("nan")
+        cvar_95 = (
+            float(return_values[cvar_mask].mean()) if cvar_mask.any() else float("nan")
+        )
     else:
         cvar_95 = float("nan")
 
@@ -133,7 +137,9 @@ def run_backtest(request: BacktestRequest) -> tuple[bt.Cerebro, dict[str, Any]] 
 
     avg_portfolio_value = fmean([request.initial_cash, cerebro.broker.getvalue()])
     turnover_ratio = (
-        total_traded_value / avg_portfolio_value if avg_portfolio_value > 0 else float("nan")
+        total_traded_value / avg_portfolio_value
+        if avg_portfolio_value > 0
+        else float("nan")
     )
 
     analysis_results = {

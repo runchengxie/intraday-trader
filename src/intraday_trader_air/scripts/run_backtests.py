@@ -285,7 +285,9 @@ def _run_benchmark(
 
 def _fetch_dividends(runtime: RuntimeContext) -> pd.DataFrame:
     if not hasattr(runtime.api, "get_dividends"):
-        _LOGGER.debug("Alpaca client has no get_dividends method; skipping dividend fetch")
+        _LOGGER.debug(
+            "Alpaca client has no get_dividends method; skipping dividend fetch"
+        )
         return pd.DataFrame()
 
     try:
@@ -462,7 +464,9 @@ def run_command(argv: Sequence[str] | None = None) -> int:
 
 
 def optimise_command(argv: Sequence[str] | None = None) -> int:
-    parser = _build_common_parser("Run parameter optimisation for configured strategies")
+    parser = _build_common_parser(
+        "Run parameter optimisation for configured strategies"
+    )
     args = parser.parse_args(argv)
     runtime = _initialise_runtime(args.config)
     strategy_configs = _strategy_selection(runtime.config, args.strategies)
@@ -483,7 +487,9 @@ def benchmark_command(argv: Sequence[str] | None = None) -> int:
     parser = _build_common_parser("Run only the configured benchmark backtest")
     args = parser.parse_args(argv)
     runtime = _initialise_runtime(args.config)
-    names, results, instances = _run_benchmark(runtime, runtime.price_frame, args.no_benchmark)
+    names, results, instances = _run_benchmark(
+        runtime, runtime.price_frame, args.no_benchmark
+    )
     _log_comparison(names, results)
     _generate_charts(runtime, instances)
     return 0
@@ -515,7 +521,9 @@ def _generate_charts(runtime: RuntimeContext, instances: dict[str, bt.Cerebro]) 
 def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - legacy CLI
     """Legacy entry point preserving the old behaviour of sequential tasks."""
 
-    parser = _build_common_parser("Run benchmark, strategies, and optimisation sequentially")
+    parser = _build_common_parser(
+        "Run benchmark, strategies, and optimisation sequentially"
+    )
     args = parser.parse_args(argv)
     runtime = _initialise_runtime(args.config)
     strategy_configs = _strategy_selection(runtime.config, args.strategies)

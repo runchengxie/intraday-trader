@@ -84,12 +84,16 @@ class EnhancedTradingSystem:
         """Automatically cancel a test order after the specified delay"""
         try:
             await asyncio.sleep(delay_seconds)
-            logger.info(f"[NO-FILL-TEST] Auto-canceling test order {order_id} after {delay_seconds} seconds")
+            logger.info(
+                f"[NO-FILL-TEST] Auto-canceling test order {order_id} after {delay_seconds} seconds"
+            )
 
             # Cancel the order
             cancel_result = self.broker_handler.cancel_order(order_id)
             if cancel_result:
-                logger.info(f"[NO-FILL-TEST] Successfully canceled test order {order_id}")
+                logger.info(
+                    f"[NO-FILL-TEST] Successfully canceled test order {order_id}"
+                )
             else:
                 logger.warning(f"[NO-FILL-TEST] Failed to cancel test order {order_id}")
 
@@ -114,9 +118,7 @@ class EnhancedTradingSystem:
             order_info = await asyncio.to_thread(
                 self.broker_handler.get_order_status, order_id
             )
-            account_info = await asyncio.to_thread(
-                self.broker_handler.get_account_info
-            )
+            account_info = await asyncio.to_thread(self.broker_handler.get_account_info)
             position_info = await asyncio.to_thread(
                 self.broker_handler.get_position, self.trading_state.symbol
             )
@@ -126,8 +128,12 @@ class EnhancedTradingSystem:
             )
             return
 
-        filled_qty = float(getattr(order_info, "filled_qty", 0.0)) if order_info else 0.0
-        order_status = getattr(order_info, "status", "unknown") if order_info else "missing"
+        filled_qty = (
+            float(getattr(order_info, "filled_qty", 0.0)) if order_info else 0.0
+        )
+        order_status = (
+            getattr(order_info, "status", "unknown") if order_info else "missing"
+        )
         account_cash = (
             float(getattr(account_info, "cash", baseline_cash or 0.0))
             if account_info
@@ -206,7 +212,6 @@ class EnhancedTradingSystem:
                     logger.warning(
                         f"[RECONCILE] Consistency validator warning for {order_id}: {warning}"
                     )
-
 
     async def _monitor_performance(self):
         """Periodically monitor and log performance"""
@@ -299,7 +304,9 @@ class EnhancedTradingSystem:
             client_order_id = update_data.get("client_order_id")
 
             # Enhanced WebSocket event logging as requested
-            logger.info(f"[WebSocket EVENT] Order ID: {order_id}, Status: {order_status}")
+            logger.info(
+                f"[WebSocket EVENT] Order ID: {order_id}, Status: {order_status}"
+            )
             logger.info(
                 f"[WebSocket EVENT] Full update - Order ID: {order_id}, Status: {order_status}, "
                 f"Client ID: {client_order_id}, Filled: {filled_qty} @ {filled_price}, Remaining: {remaining_qty}"
@@ -308,23 +315,36 @@ class EnhancedTradingSystem:
             # Check if this is a test order
             is_test_order = client_order_id and "no-fill-test" in client_order_id
             if is_test_order:
-                logger.info(f"[NO-FILL-TEST] [WebSocket EVENT] Test order update: {order_id} -> {order_status}")
+                logger.info(
+                    f"[NO-FILL-TEST] [WebSocket EVENT] Test order update: {order_id} -> {order_status}"
+                )
 
             # Update stream status in trading state for reconciliation
             if order_id:
                 import time
-                self.trading_state.update_stream_order_status(order_id, order_status, time.time())
-                logger.debug(f"[WebSocket EVENT] Updated stream status for order {order_id}: {order_status}")
+
+                self.trading_state.update_stream_order_status(
+                    order_id, order_status, time.time()
+                )
+                logger.debug(
+                    f"[WebSocket EVENT] Updated stream status for order {order_id}: {order_status}"
+                )
 
             # Update active order tracking
             if order_status in ["filled", "canceled", "expired", "rejected"]:
                 if order_id == self.trading_state.active_order_id:
-                    logger.info(f"[WebSocket EVENT] Order {order_id} reached terminal state: {order_status}")
+                    logger.info(
+                        f"[WebSocket EVENT] Order {order_id} reached terminal state: {order_status}"
+                    )
                     self.trading_state.clear_active_order()
-                    logger.info(f"[WebSocket EVENT] Cleared active order tracking for {order_id}")
+                    logger.info(
+                        f"[WebSocket EVENT] Cleared active order tracking for {order_id}"
+                    )
 
                     if is_test_order:
-                        logger.info(f"[NO-FILL-TEST] [WebSocket EVENT] Test order {order_id} completed with status: {order_status}")
+                        logger.info(
+                            f"[NO-FILL-TEST] [WebSocket EVENT] Test order {order_id} completed with status: {order_status}"
+                        )
 
             # Log trade if order is filled
             if order_status == "filled" and self.db_handler:
@@ -340,7 +360,9 @@ class EnhancedTradingSystem:
                 logger.info(f"[WebSocket EVENT] Trade record logged: {trade_record}")
 
                 if is_test_order:
-                    logger.warning(f"[NO-FILL-TEST] [WebSocket EVENT] UNEXPECTED: Test order {order_id} was filled! This should not happen.")
+                    logger.warning(
+                        f"[NO-FILL-TEST] [WebSocket EVENT] UNEXPECTED: Test order {order_id} was filled! This should not happen."
+                    )
 
             # Update position tracking
             if filled_qty != 0:
@@ -353,7 +375,9 @@ class EnhancedTradingSystem:
                 )
 
                 if is_test_order:
-                    logger.warning(f"[NO-FILL-TEST] [WebSocket EVENT] UNEXPECTED: Test order caused position change! Old: {old_position}, New: {self.trading_state.current_position_qty}")
+                    logger.warning(
+                        f"[NO-FILL-TEST] [WebSocket EVENT] UNEXPECTED: Test order caused position change! Old: {old_position}, New: {self.trading_state.current_position_qty}"
+                    )
 
         except Exception as e:
             logger.error(f"[WebSocket EVENT] Error in handle_trade_update: {e}")
@@ -441,87 +465,115 @@ class EnhancedTradingSystem:
     @handle_exceptions(ErrorCategory.ORDER_EXECUTION, ErrorSeverity.HIGH)
     def _execute_trade(self, signal: str, current_price: float):
         # Check if no-fill test mode is enabled
-        no_fill_config = self.app_config.get('live_trading', {}).get('no_fill_test_mode', {})
-        is_test_mode = no_fill_config.get('enabled', False)
+        no_fill_config = self.app_config.get("live_trading", {}).get(
+            "no_fill_test_mode", {}
+        )
+        is_test_mode = no_fill_config.get("enabled", False)
 
         baseline_cash = self.trading_state.last_known_cash
         baseline_position = self.trading_state.current_position_qty
 
-        strategy_name = "mean_reversion" # dynamically get the currently running strategy
-        strategy_config = self.app_config['strategies'][strategy_name]
-        order_settings = strategy_config.get('order_settings', {})
+        strategy_name = (
+            "mean_reversion"  # dynamically get the currently running strategy
+        )
+        strategy_config = self.app_config["strategies"][strategy_name]
+        order_settings = strategy_config.get("order_settings", {})
 
         # --- Determine order parameters based on signal and configuration ---
         order_params = {
             "symbol": self.trading_state.symbol,
             "qty": 10,
             "time_in_force": "day",
-            "client_order_id": f"{'no-fill-test' if is_test_mode else 'live'}_{uuid.uuid4()}"
+            "client_order_id": f"{'no-fill-test' if is_test_mode else 'live'}_{uuid.uuid4()}",
         }
 
         if self.trading_state.current_position_qty != 0 and signal == "CLOSE":
             if is_test_mode:
-                logger.info(f"[NO-FILL-TEST] Skipping CLOSE signal in test mode for {order_params['symbol']}")
+                logger.info(
+                    f"[NO-FILL-TEST] Skipping CLOSE signal in test mode for {order_params['symbol']}"
+                )
                 return
             # If it's a CLOSE signal, directly use a market order to close the position
-            logger.info(f"Executing CLOSE signal for {order_params['symbol']} with market order.")
-            self.broker_handler.api.close_position(order_params['symbol'])
+            logger.info(
+                f"Executing CLOSE signal for {order_params['symbol']} with market order."
+            )
+            self.broker_handler.api.close_position(order_params["symbol"])
             return
 
         # --- Handle open position signals ---
         if signal == "BUY":
-            order_params['side'] = 'buy'
+            order_params["side"] = "buy"
             if is_test_mode:
-                order_params['order_type'] = 'limit'
+                order_params["order_type"] = "limit"
             else:
-                order_params['order_type'] = order_settings.get('entry_order_type', 'market')
+                order_params["order_type"] = order_settings.get(
+                    "entry_order_type", "market"
+                )
         elif signal == "SELL":
-            order_params['side'] = 'sell'
+            order_params["side"] = "sell"
             if is_test_mode:
-                order_params['order_type'] = 'limit'
+                order_params["order_type"] = "limit"
             else:
-                order_params['order_type'] = order_settings.get('entry_order_type', 'market')
+                order_params["order_type"] = order_settings.get(
+                    "entry_order_type", "market"
+                )
         else:
-            return # Do not process 'HOLD'
+            return  # Do not process 'HOLD'
 
         # Calculate limit price based on mode
-        if order_params['order_type'] == 'limit':
+        if order_params["order_type"] == "limit":
             if is_test_mode:
                 # NO-FILL TEST LOGIC: Place orders far from market to ensure they don't fill
-                price_offset = no_fill_config.get('price_offset_pct', 0.10)
-                if order_params['side'] == 'buy':
+                price_offset = no_fill_config.get("price_offset_pct", 0.10)
+                if order_params["side"] == "buy":
                     # For buy orders, place limit price 10% below market to ensure no fill
-                    order_params['limit_price'] = round(current_price * (1 - price_offset), 2)
+                    order_params["limit_price"] = round(
+                        current_price * (1 - price_offset), 2
+                    )
                 else:  # sell
                     # For sell orders, place limit price 10% above market to ensure no fill
-                    order_params['limit_price'] = round(current_price * (1 + price_offset), 2)
+                    order_params["limit_price"] = round(
+                        current_price * (1 + price_offset), 2
+                    )
 
-                logger.info(f"[NO-FILL-TEST] Submitting {order_params['side']} limit order for {order_params['qty']} @ {order_params['limit_price']:.2f} with key {order_params['client_order_id']}")
-                logger.info(f"[NO-FILL-TEST] Current market price: {current_price:.2f}, Offset: {price_offset*100:.1f}%")
+                logger.info(
+                    f"[NO-FILL-TEST] Submitting {order_params['side']} limit order for {order_params['qty']} @ {order_params['limit_price']:.2f} with key {order_params['client_order_id']}"
+                )
+                logger.info(
+                    f"[NO-FILL-TEST] Current market price: {current_price:.2f}, Offset: {price_offset * 100:.1f}%"
+                )
             else:
                 # Normal limit order logic
-                offset = order_settings.get('limit_price_offset_pct', 0.0)
-                if order_params['side'] == 'buy':
+                offset = order_settings.get("limit_price_offset_pct", 0.0)
+                if order_params["side"] == "buy":
                     # When buying, the limit price can be slightly higher than the current price to ensure execution
-                    order_params['limit_price'] = current_price * (1 + offset)
-                else: # sell
+                    order_params["limit_price"] = current_price * (1 + offset)
+                else:  # sell
                     # When selling, the limit price can be slightly lower than the current price
-                    order_params['limit_price'] = current_price * (1 - offset)
-                logger.info(f"Calculated limit price: {order_params['limit_price']:.2f}")
+                    order_params["limit_price"] = current_price * (1 - offset)
+                logger.info(
+                    f"Calculated limit price: {order_params['limit_price']:.2f}"
+                )
 
         # --- Place order ---
         order_result = self.broker_handler.place_order(**order_params)
 
-        if order_result and hasattr(order_result, 'id'):
+        if order_result and hasattr(order_result, "id"):
             if is_test_mode:
-                logger.info(f"[NO-FILL-TEST] Order placed successfully: {order_result.id}")
+                logger.info(
+                    f"[NO-FILL-TEST] Order placed successfully: {order_result.id}"
+                )
                 # Schedule automatic cancellation for test orders
-                test_duration = no_fill_config.get('test_duration_seconds', 60)
-                asyncio.create_task(self._auto_cancel_test_order(order_result.id, test_duration))
+                test_duration = no_fill_config.get("test_duration_seconds", 60)
+                asyncio.create_task(
+                    self._auto_cancel_test_order(order_result.id, test_duration)
+                )
             else:
                 logger.info(f"Order placed successfully: {order_result.id}")
 
-            self.trading_state.set_active_order(order_result.id, order_result.client_order_id)
+            self.trading_state.set_active_order(
+                order_result.id, order_result.client_order_id
+            )
 
             try:
                 loop = asyncio.get_running_loop()
@@ -530,7 +582,7 @@ class EnhancedTradingSystem:
                         order_result.id,
                         baseline_cash=baseline_cash,
                         baseline_position=baseline_position,
-                        side=order_params.get('side', 'buy'),
+                        side=order_params.get("side", "buy"),
                         reference_price=current_price,
                         is_test_mode=is_test_mode,
                     )
@@ -573,7 +625,6 @@ class EnhancedTradingSystem:
 
             except Exception as e:
                 logger.error(f"Error fetching initial state: {e}", exc_info=True)
-
 
             # Get initial account and position state
             logger.info("Fetching initial account and position state...")
@@ -678,18 +729,13 @@ class EnhancedTradingSystem:
         while not self._stop_requested.is_set():
             try:
                 current_time = asyncio.get_event_loop().time()
-                if (
-                    current_time - last_account_refresh_time
-                    >= ACCOUNT_REFRESH_INTERVAL
-                ):
+                if current_time - last_account_refresh_time >= ACCOUNT_REFRESH_INTERVAL:
                     logger.info(
                         "[RECONCILE] Starting periodic account and position refresh..."
                     )
                     try:
                         # Enhanced reconciliation logging for account info
-                        refreshed_account_info = (
-                            self.broker_handler.get_account_info()
-                        )
+                        refreshed_account_info = self.broker_handler.get_account_info()
                         if refreshed_account_info:
                             if (
                                 self.trading_state.last_known_cash is not None
@@ -702,9 +748,13 @@ class EnhancedTradingSystem:
                                 logger.warning(
                                     f"[RECONCILE] Cash mismatch detected! Stream state: ${self.trading_state.last_known_cash:.2f}, REST API state: ${float(refreshed_account_info.cash):.2f}"
                                 )
-                                logger.info("[RECONCILE] Trusting REST API cash value and updating internal state")
+                                logger.info(
+                                    "[RECONCILE] Trusting REST API cash value and updating internal state"
+                                )
                             else:
-                                logger.info(f"[RECONCILE] Cash values consistent: ${float(refreshed_account_info.cash):.2f}")
+                                logger.info(
+                                    f"[RECONCILE] Cash values consistent: ${float(refreshed_account_info.cash):.2f}"
+                                )
 
                             self.trading_state.update_cash_and_value(
                                 float(refreshed_account_info.cash),
@@ -712,68 +762,101 @@ class EnhancedTradingSystem:
                             )
 
                         # Enhanced reconciliation logging for positions
-                        refreshed_position_info = (
-                            self.broker_handler.get_position(
-                                self.trading_state.symbol
-                            )
+                        refreshed_position_info = self.broker_handler.get_position(
+                            self.trading_state.symbol
                         )
                         refreshed_qty = 0.0
                         if refreshed_position_info:
                             refreshed_qty = float(refreshed_position_info.qty)
 
-                        logger.info(f"[RECONCILE] Position check for {self.trading_state.symbol}: Stream state: {self.trading_state.current_position_qty}, REST API state: {refreshed_qty}")
+                        logger.info(
+                            f"[RECONCILE] Position check for {self.trading_state.symbol}: Stream state: {self.trading_state.current_position_qty}, REST API state: {refreshed_qty}"
+                        )
 
                         if (
-                            abs(
-                                refreshed_qty
-                                - self.trading_state.current_position_qty
-                            )
+                            abs(refreshed_qty - self.trading_state.current_position_qty)
                             > 0.01
                         ):
                             logger.warning(
                                 f"[RECONCILE] Position mismatch detected! Stream state: {self.trading_state.current_position_qty}, REST API state: {refreshed_qty}"
                             )
-                            logger.warning("[RECONCILE] Trusting REST API state and syncing internal position")
+                            logger.warning(
+                                "[RECONCILE] Trusting REST API state and syncing internal position"
+                            )
                             self.trading_state.update_position(refreshed_qty)
                             logger.info(
                                 f"[RECONCILE] Position synchronized to REST API: {self.trading_state.symbol} -> {refreshed_qty}"
                             )
                         else:
-                            logger.info(f"[RECONCILE] Position values consistent for {self.trading_state.symbol}: {refreshed_qty}")
+                            logger.info(
+                                f"[RECONCILE] Position values consistent for {self.trading_state.symbol}: {refreshed_qty}"
+                            )
 
                         # Enhanced order status reconciliation
                         if self.trading_state.active_order_id:
-                            logger.info(f"[RECONCILE] Checking active order status: {self.trading_state.active_order_id}")
+                            logger.info(
+                                f"[RECONCILE] Checking active order status: {self.trading_state.active_order_id}"
+                            )
 
                             # Get the official state from the REST API
-                            refreshed_order_info = self.broker_handler.get_order_status(self.trading_state.active_order_id)
-                            rest_status = refreshed_order_info.status if refreshed_order_info else "not_found"
+                            refreshed_order_info = self.broker_handler.get_order_status(
+                                self.trading_state.active_order_id
+                            )
+                            rest_status = (
+                                refreshed_order_info.status
+                                if refreshed_order_info
+                                else "not_found"
+                            )
 
                             # Get the last known state from the WebSocket stream
-                            stream_status = self.trading_state.last_known_stream_status or "unknown"
+                            stream_status = (
+                                self.trading_state.last_known_stream_status or "unknown"
+                            )
 
-                            logger.info(f"[RECONCILE] Order {self.trading_state.active_order_id} status comparison - Stream: '{stream_status}', REST API: '{rest_status}'")
+                            logger.info(
+                                f"[RECONCILE] Order {self.trading_state.active_order_id} status comparison - Stream: '{stream_status}', REST API: '{rest_status}'"
+                            )
 
                             if stream_status != rest_status:
-                                logger.warning(f"[RECONCILE] Order status mismatch detected! Stream state: '{stream_status}', REST API state: '{rest_status}'")
-                                logger.warning(f"[RECONCILE] Trusting REST API state: '{rest_status}'. Updating internal state.")
+                                logger.warning(
+                                    f"[RECONCILE] Order status mismatch detected! Stream state: '{stream_status}', REST API state: '{rest_status}'"
+                                )
+                                logger.warning(
+                                    f"[RECONCILE] Trusting REST API state: '{rest_status}'. Updating internal state."
+                                )
 
                                 # Update the stream status to match REST API
                                 import time
-                                self.trading_state.update_stream_order_status(self.trading_state.active_order_id, rest_status, time.time())
+
+                                self.trading_state.update_stream_order_status(
+                                    self.trading_state.active_order_id,
+                                    rest_status,
+                                    time.time(),
+                                )
 
                                 # Handle terminal states
-                                if rest_status in ["filled", "canceled", "expired", "rejected"]:
-                                    logger.info(f"[RECONCILE] Order {self.trading_state.active_order_id} is in terminal state '{rest_status}', clearing active order tracking")
+                                if rest_status in [
+                                    "filled",
+                                    "canceled",
+                                    "expired",
+                                    "rejected",
+                                ]:
+                                    logger.info(
+                                        f"[RECONCILE] Order {self.trading_state.active_order_id} is in terminal state '{rest_status}', clearing active order tracking"
+                                    )
                                     self.trading_state.clear_active_order()
 
                             else:
-                                logger.info(f"[RECONCILE] Order status consistent: '{rest_status}'. No action needed.")
+                                logger.info(
+                                    f"[RECONCILE] Order status consistent: '{rest_status}'. No action needed."
+                                )
                         else:
                             logger.debug("[RECONCILE] No active order to reconcile")
 
                         last_account_refresh_time = current_time
-                        logger.info("[RECONCILE] Periodic reconciliation completed successfully")
+                        logger.info(
+                            "[RECONCILE] Periodic reconciliation completed successfully"
+                        )
 
                     except Exception as refresh_err:
                         logger.error(
@@ -782,9 +865,7 @@ class EnhancedTradingSystem:
                         )
 
                 # Process from the queue
-                queued_item = await asyncio.wait_for(
-                    self.data_queue.get(), timeout=1.0
-                )
+                queued_item = await asyncio.wait_for(self.data_queue.get(), timeout=1.0)
                 data_type = queued_item.get("type")
                 logger.debug(
                     f"Processing item from queue: Type={data_type}, Item={queued_item}"
@@ -818,7 +899,9 @@ class EnhancedTradingSystem:
                                 "signal": (
                                     1.0
                                     if signal == "BUY"
-                                    else -1.0 if signal == "SELL" else 0.0
+                                    else -1.0
+                                    if signal == "SELL"
+                                    else 0.0
                                 ),
                                 "price": current_price,
                                 "confidence": self.trading_strategy.get_signal_confidence(),
@@ -830,46 +913,75 @@ class EnhancedTradingSystem:
                         )
 
                 # Execute trades if signal generated and no active order
-                if signal not in [None, "HOLD"] and self.trading_state.active_order_id is None:
-                    logger.info(f"Received signal: {signal} for {self.trading_state.symbol}")
+                if (
+                    signal not in [None, "HOLD"]
+                    and self.trading_state.active_order_id is None
+                ):
+                    logger.info(
+                        f"Received signal: {signal} for {self.trading_state.symbol}"
+                    )
 
                     # --- START OF NEW PRE-TRADE CHECKS ---
-                    order_qty = 10 # Example fixed quantity
+                    order_qty = 10  # Example fixed quantity
                     trade_value = order_qty * current_price
 
                     # 1. Liquidity and Impact Check
-                    avg_volume = np.mean(list(self.risk_manager.volume_history)) if self.risk_manager.volume_history else 0
-                    volatility = np.std(list(self.risk_manager.returns_history)) if len(self.risk_manager.returns_history) > 1 else 0
+                    avg_volume = (
+                        np.mean(list(self.risk_manager.volume_history))
+                        if self.risk_manager.volume_history
+                        else 0
+                    )
+                    volatility = (
+                        np.std(list(self.risk_manager.returns_history))
+                        if len(self.risk_manager.returns_history) > 1
+                        else 0
+                    )
 
-                    liquidity_passed, liquidity_details = self.risk_manager.check_liquidity_and_impact(
-                        order_size=order_qty,
-                        recent_avg_volume=avg_volume,
-                        current_volatility=volatility
+                    liquidity_passed, liquidity_details = (
+                        self.risk_manager.check_liquidity_and_impact(
+                            order_size=order_qty,
+                            recent_avg_volume=avg_volume,
+                            current_volatility=volatility,
+                        )
                     )
 
                     # 2. Leverage and Exposure Check
-                    portfolio_value = self.trading_state.last_known_portfolio_value or self.performance_analyzer.initial_capital
-                    gross_position_value = abs(self.trading_state.current_position_qty * current_price)
+                    portfolio_value = (
+                        self.trading_state.last_known_portfolio_value
+                        or self.performance_analyzer.initial_capital
+                    )
+                    gross_position_value = abs(
+                        self.trading_state.current_position_qty * current_price
+                    )
 
-                    leverage_passed, leverage_warnings = self.risk_manager.check_leverage_and_exposure(
-                        proposed_trade_value=trade_value,
-                        portfolio_value=portfolio_value,
-                        gross_position_value=gross_position_value,
-                        cash=self.trading_state.last_known_cash
+                    leverage_passed, leverage_warnings = (
+                        self.risk_manager.check_leverage_and_exposure(
+                            proposed_trade_value=trade_value,
+                            portfolio_value=portfolio_value,
+                            gross_position_value=gross_position_value,
+                            cash=self.trading_state.last_known_cash,
+                        )
                     )
 
                     # 3. Final Decision
                     if liquidity_passed and leverage_passed:
-                        logger.info("All pre-trade risk checks passed. Proceeding with trade execution.")
+                        logger.info(
+                            "All pre-trade risk checks passed. Proceeding with trade execution."
+                        )
                         self._execute_trade(signal, current_price)
                     else:
-                        all_warnings = liquidity_details.get("warnings", []) + leverage_warnings
+                        all_warnings = (
+                            liquidity_details.get("warnings", []) + leverage_warnings
+                        )
                         logger.warning(
                             f"Trade aborted for {self.trading_state.symbol} due to failed risk checks: {'; '.join(all_warnings)}"
                         )
                     # --- END OF NEW PRE-TRADE CHECKS ---
 
-                elif signal not in [None, "HOLD"] and self.trading_state.active_order_id is not None:
+                elif (
+                    signal not in [None, "HOLD"]
+                    and self.trading_state.active_order_id is not None
+                ):
                     logger.info(
                         f"Holding off on new signal {signal}, active order exists: {self.trading_state.active_order_id}"
                     )
@@ -882,9 +994,7 @@ class EnhancedTradingSystem:
                 )
                 continue
             except Exception as loop_error:
-                logger.error(
-                    f"Error in main trading loop: {loop_error}", exc_info=True
-                )
+                logger.error(f"Error in main trading loop: {loop_error}", exc_info=True)
                 await asyncio.sleep(5)
 
     async def _verify_state_once(self):
@@ -915,7 +1025,9 @@ class EnhancedTradingSystem:
                 f"Stream state is {stream_qty}, but REST API state is {api_qty}. Syncing."
             )
             self.trading_state.update_position(api_qty)
-            logger.info(f"[VERIFY] Sync complete. Position for {self.trading_state.symbol} is now {api_qty}.")
+            logger.info(
+                f"[VERIFY] Sync complete. Position for {self.trading_state.symbol} is now {api_qty}."
+            )
         else:
             logger.info(
                 f"[VERIFY] State consistent for {self.trading_state.symbol}: "

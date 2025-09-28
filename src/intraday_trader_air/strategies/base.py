@@ -52,7 +52,12 @@ class OrderLoggerMixin:
             self.log(
                 f"{dt}, ORDER {order.ref} {name}, Price: {order.executed.price:.2f}, Size: {order.executed.size}, Value: {order.executed.value:.2f}, Comm: {order.executed.comm:.2f}"
             )
-        elif cur in (bt.Order.Canceled, bt.Order.Expired, bt.Order.Margin, bt.Order.Rejected):
+        elif cur in (
+            bt.Order.Canceled,
+            bt.Order.Expired,
+            bt.Order.Margin,
+            bt.Order.Rejected,
+        ):
             self.log(f"{dt}, ORDER {order.ref} {name}")
         elif cur == bt.Order.Partial:
             self.log(f"{dt}, ORDER {order.ref} {name}, Filled: {order.executed.size}")

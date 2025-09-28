@@ -46,7 +46,13 @@ def alpaca_stub() -> Iterator[object]:
             self._calls: list[tuple[str, tuple, dict]] = []
 
         def get_bars(self, symbol, timeframe, start, end, adjustment="raw"):
-            self._calls.append(("get_bars", (symbol, timeframe, start, end), {"adjustment": adjustment}))
+            self._calls.append(
+                (
+                    "get_bars",
+                    (symbol, timeframe, start, end),
+                    {"adjustment": adjustment},
+                )
+            )
             import pandas as pd
 
             index = pd.date_range(start=start, periods=2, freq="min", tz="UTC")
@@ -63,7 +69,9 @@ def alpaca_stub() -> Iterator[object]:
             frame.index.name = "timestamp"
             return type("Response", (), {"df": frame})
 
-        def get_dividends(self, symbol, start, end):  # pragma: no cover - used selectively
+        def get_dividends(
+            self, symbol, start, end
+        ):  # pragma: no cover - used selectively
             self._calls.append(("get_dividends", (symbol, start, end), {}))
             return type(
                 "Dividends",
@@ -121,4 +129,3 @@ def mocker():
     finally:
         while active_patchers:
             active_patchers.pop().stop()
-

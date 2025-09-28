@@ -23,11 +23,14 @@ project_root = Path(__file__).resolve().parent.parent.parent
 pytestmark = pytest.mark.integration
 
 # --- Test Logging Configuration ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
 # --- Pytest Fixtures ---
+
 
 @pytest.fixture(scope="module")
 def db_handler():
@@ -42,7 +45,9 @@ def db_handler():
         # Load config to get database connection details
         load_dotenv(dotenv_path=project_root / ".env")
         config = load_app_config(project_root / "config.yml")
-        db_config = asdict(config.database) if config.database else {"backend": "sqlite"}
+        db_config = (
+            asdict(config.database) if config.database else {"backend": "sqlite"}
+        )
 
         if db_config.get("backend", "sqlite").lower() == "sqlite":
             tmp_db_path = project_root / "output" / "test_trading.db"
@@ -71,16 +76,23 @@ def db_handler():
                 connection.execute(text("DROP TABLE IF EXISTS performance_snapshots;"))
                 connection.commit()
             logger.info("Test database tables dropped successfully.")
-            if handler.backend == "sqlite" and handler.sqlite_path and handler.sqlite_path.exists():
+            if (
+                handler.backend == "sqlite"
+                and handler.sqlite_path
+                and handler.sqlite_path.exists()
+            ):
                 handler.sqlite_path.unlink(missing_ok=True)
         elif handler.backend == "parquet" and handler.storage_dir:
             for artifact in handler.storage_dir.glob("*.parquet"):
                 artifact.unlink(missing_ok=True)
 
+
 @pytest.fixture(scope="module")
 def sample_market_data():
     """Creates a standard, reusable Pandas DataFrame for testing market data functions."""
-    dates = pd.to_datetime(pd.date_range(start="2023-01-01", periods=5, freq="min", tz="America/New_York"))
+    dates = pd.to_datetime(
+        pd.date_range(start="2023-01-01", periods=5, freq="min", tz="America/New_York")
+    )
     data = {
         "open": [100.0, 101.0, 102.0, 103.0, 104.0],
         "high": [101.0, 102.0, 103.0, 104.0, 105.0],
@@ -95,6 +107,7 @@ def sample_market_data():
 
 # --- Integration Tests ---
 
+
 def test_db_connection_and_initialization(db_handler):
     """
     Tests if the DBHandler can connect to the database and if the tables
@@ -106,13 +119,17 @@ def test_db_connection_and_initialization(db_handler):
         inspector = inspect(db_handler.engine)
         assert inspector.has_table("market_data"), "Table 'market_data' should exist."
         assert inspector.has_table("trade_logs"), "Table 'trade_logs' should exist."
-        assert inspector.has_table("performance_snapshots"), "Table 'performance_snapshots' should exist."
+        assert inspector.has_table("performance_snapshots"), (
+            "Table 'performance_snapshots' should exist."
+        )
 
         if db_handler.backend in {"postgres", "postgresql"}:
             with db_handler.engine.connect() as conn:
-                is_hypertable = conn.execute(text(
-                    "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'market_data';"
-                )).scalar_one_or_none()
+                is_hypertable = conn.execute(
+                    text(
+                        "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'market_data';"
+                    )
+                ).scalar_one_or_none()
                 assert is_hypertable == 1, "'market_data' should be a hypertable."
     else:
         # Parquet backend: ensure storage directory exists
@@ -137,7 +154,9 @@ def test_save_and_get_market_data(db_handler, sample_market_data):
 
     # Assert: The retrieved data should be identical to the saved data
     assert not retrieved_df.empty, "Retrieved data should not be empty."
-    pd.testing.assert_frame_equal(retrieved_df[sample_market_data.columns], sample_market_data)
+    pd.testing.assert_frame_equal(
+        retrieved_df[sample_market_data.columns], sample_market_data
+    )
     logger.info("Save and get market data functionality verified.")
 
 
@@ -152,16 +171,22 @@ def test_market_data_upsert_logic(db_handler, sample_market_data):
     # Act 1: First save
     logger.info("Performing first save operation...")
     db_handler.save_market_data(sample_market_data, symbol)
-    count_after_first_save = len(db_handler.get_market_data(symbol, "2023-01-01", "2023-01-02"))
+    count_after_first_save = len(
+        db_handler.get_market_data(symbol, "2023-01-01", "2023-01-02")
+    )
     assert count_after_first_save == 5, "Should have 5 rows after first save."
 
     # Act 2: Second save with the exact same data
     logger.info("Performing second save with identical data...")
     db_handler.save_market_data(sample_market_data, symbol)
-    count_after_second_save = len(db_handler.get_market_data(symbol, "2023-01-01", "2023-01-02"))
+    count_after_second_save = len(
+        db_handler.get_market_data(symbol, "2023-01-01", "2023-01-02")
+    )
 
     # Assert
-    assert count_after_second_save == 5, "Row count should remain 5, proving ON CONFLICT worked."
+    assert count_after_second_save == 5, (
+        "Row count should remain 5, proving ON CONFLICT worked."
+    )
     logger.info("Upsert logic verified. No duplicate rows were inserted.")
 
 
@@ -172,16 +197,28 @@ def test_log_and_get_trade_record(db_handler):
     test_order_id = f"test_trade_{int(now.timestamp())}"
 
     # Arrange: Create an ORM object
-    trade = TradeLog(timestamp=now, order_id=test_order_id, symbol="TEST_TRADE", side="buy", quantity=10, price=150.5, commission=1.0)
+    trade = TradeLog(
+        timestamp=now,
+        order_id=test_order_id,
+        symbol="TEST_TRADE",
+        side="buy",
+        quantity=10,
+        price=150.5,
+        commission=1.0,
+    )
 
     # Act: Log the trade and then fetch it back
     logger.info(f"Logging a test trade with order_id: {test_order_id}")
     db_handler.log_trade_record(trade)
-    trades_df = db_handler.get_trade_logs_as_df(now - timedelta(minutes=1), now + timedelta(minutes=1))
+    trades_df = db_handler.get_trade_logs_as_df(
+        now - timedelta(minutes=1), now + timedelta(minutes=1)
+    )
 
     # Assert
     assert not trades_df.empty, "Trade logs DataFrame should not be empty."
-    assert test_order_id in trades_df["order_id"].values, "The test trade should be in the retrieved data."
+    assert test_order_id in trades_df["order_id"].values, (
+        "The test trade should be in the retrieved data."
+    )
     logger.info("Trade log and retrieval via DataFrame verified.")
 
 
@@ -191,14 +228,20 @@ def test_log_and_get_performance_snapshot(db_handler):
     now = datetime.utcnow()
 
     # Arrange
-    snapshot = PerformanceSnapshot(timestamp=now, portfolio_value=105000.75, cash=25000.25)
+    snapshot = PerformanceSnapshot(
+        timestamp=now, portfolio_value=105000.75, cash=25000.25
+    )
 
     # Act
     logger.info(f"Logging a test performance snapshot at {now.isoformat()}")
     db_handler.log_performance_snapshot(snapshot)
-    snapshots_df = db_handler.get_performance_snapshots_as_df(now - timedelta(minutes=1), now + timedelta(minutes=1))
+    snapshots_df = db_handler.get_performance_snapshots_as_df(
+        now - timedelta(minutes=1), now + timedelta(minutes=1)
+    )
 
     # Assert
-    assert not snapshots_df.empty, "Performance snapshots DataFrame should not be empty."
+    assert not snapshots_df.empty, (
+        "Performance snapshots DataFrame should not be empty."
+    )
     assert snapshots_df["portfolio_value"].iloc[0] == pytest.approx(105000.75)
     logger.info("Performance snapshot log and retrieval verified.")

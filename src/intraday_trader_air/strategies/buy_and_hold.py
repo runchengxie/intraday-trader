@@ -6,9 +6,7 @@ import backtrader as bt
 class BuyAndHoldStrategy(bt.Strategy):
     """Simple buy-and-hold strategy that fully allocates capital on first bar."""
 
-    params = (
-        ("size_pct", 1.0),
-    )
+    params = (("size_pct", 1.0),)
 
     def next(self):
         if not self.position:

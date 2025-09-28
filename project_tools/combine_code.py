@@ -41,7 +41,7 @@ EXCLUDE_DIRS_ROOT_ONLY: set[str] = {
     "project_tools",
     "tests",
     ".ruff_cache",
-#     "docs",
+    #     "docs",
 }
 
 # Directory name patterns to exclude (e.g., any directory ending with .egg-info).
@@ -115,9 +115,9 @@ def process_notebook(filepath: Path) -> str | None:
                 continue
 
             if cell_type == "code":
-                content_parts.append(f"# --- Code Cell {i+1} ---\n{source}\n")
+                content_parts.append(f"# --- Code Cell {i + 1} ---\n{source}\n")
             elif cell_type == "markdown":
-                content_parts.append(f"# --- Markdown Cell {i+1} ---\n{source}\n")
+                content_parts.append(f"# --- Markdown Cell {i + 1} ---\n{source}\n")
 
         return "\n".join(content_parts)
     except Exception as e:

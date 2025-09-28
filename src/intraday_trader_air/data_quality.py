@@ -87,9 +87,7 @@ def _check_missing_bars(
         expected_frequency = inferred if inferred else "infer"
 
     try:
-        expected_range = pd.date_range(
-            index[0], index[-1], freq=expected_frequency
-        )
+        expected_range = pd.date_range(index[0], index[-1], freq=expected_frequency)
     except ValueError:
         logger.warning(
             "Unable to build expected index using frequency '%s'", expected_frequency
@@ -133,9 +131,7 @@ def _check_nulls(df: pd.DataFrame) -> QualityCheckResult:
     )
 
 
-def _check_price_jumps(
-    df: pd.DataFrame, threshold: float = 0.1
-) -> QualityCheckResult:
+def _check_price_jumps(df: pd.DataFrame, threshold: float = 0.1) -> QualityCheckResult:
     if "close" not in df.columns:
         return QualityCheckResult(
             name="price_jumps",
@@ -240,9 +236,7 @@ def write_quality_report(report: dict[str, object], output_dir: Path) -> Path:
     return output_path
 
 
-def build_expected_frequency(
-    timeframe_value: int, timeframe_unit: str
-) -> str | None:
+def build_expected_frequency(timeframe_value: int, timeframe_unit: str) -> str | None:
     """Translate the configuration timeframe into a pandas offset alias."""
 
     unit = timeframe_unit.lower()

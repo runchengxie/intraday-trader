@@ -71,7 +71,9 @@ def _build_cache_path(
     return os.path.join(cache_dir, cache_filename)
 
 
-def _normalize_index_and_clip(df: pd.DataFrame, start_date: str, end_date: str) -> pd.DataFrame:
+def _normalize_index_and_clip(
+    df: pd.DataFrame, start_date: str, end_date: str
+) -> pd.DataFrame:
     if df is None or df.empty:
         return df
 
@@ -313,7 +315,9 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: The DataFrame with added indicator columns.
     """
     if not all(col in df.columns for col in ["high", "low", "close"]):
-        logger.error("DataFrame is missing required columns ('high','low','close') for TA.")
+        logger.error(
+            "DataFrame is missing required columns ('high','low','close') for TA."
+        )
         return df
 
     logger.info("Adding technical indicators (SMA, EMA, ADX) using pandas only...")

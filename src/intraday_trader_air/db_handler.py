@@ -95,7 +95,9 @@ class DBHandler:
     def initialize_db(self):
         """Creates tables for SQL backends. File-based backends need no setup."""
         if self.backend == "parquet":
-            logger.info("Parquet backend selected; no database initialization required.")
+            logger.info(
+                "Parquet backend selected; no database initialization required."
+            )
             return
 
         if not self.engine:
@@ -108,17 +110,19 @@ class DBHandler:
             if self.backend in {"postgres", "postgresql"}:
                 self._ensure_timescale_hypertables()
         except ProgrammingError as e:
-            if (
-                self.backend in {"postgres", "postgresql"}
-                and "timescaledb_information.hypertables" in str(e)
-            ):
+            if self.backend in {
+                "postgres",
+                "postgresql",
+            } and "timescaledb_information.hypertables" in str(e):
                 logger.info("TimescaleDB extension not found. Enabling it now.")
                 with self.engine.connect() as conn:
                     conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb;"))
                     conn.commit()
                 self._ensure_timescale_hypertables()
             else:
-                logger.error("A database programming error occurred: %s", e, exc_info=True)
+                logger.error(
+                    "A database programming error occurred: %s", e, exc_info=True
+                )
                 raise
         except Exception as e:
             logger.error("Error initializing database: %s", e, exc_info=True)
@@ -192,7 +196,9 @@ class DBHandler:
         )
 
         temp_table_name = "temp_market_data_upload"
-        df_to_save.to_sql(temp_table_name, self.engine, if_exists="replace", index=False)
+        df_to_save.to_sql(
+            temp_table_name, self.engine, if_exists="replace", index=False
+        )
 
         if self.backend == "sqlite":
             upsert_statement = text(
@@ -236,14 +242,18 @@ class DBHandler:
                 existing["timestamp"], errors="coerce"
             )
             combined = pd.concat([existing, df], ignore_index=True)
-            combined.drop_duplicates(subset=["timestamp", "symbol"], keep="last", inplace=True)
+            combined.drop_duplicates(
+                subset=["timestamp", "symbol"], keep="last", inplace=True
+            )
         else:
             combined = df
         combined.sort_values(["symbol", "timestamp"], inplace=True)
         combined.to_parquet(path, index=False)
         logger.info("Stored %d rows to %s", len(df), path)
 
-    def get_market_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    def get_market_data(
+        self, symbol: str, start_date: str, end_date: str
+    ) -> pd.DataFrame:
         """Retrieves market data from the configured backend."""
         if self.backend == "parquet":
             return self._get_market_data_parquet(symbol, start_date, end_date)
@@ -264,7 +274,9 @@ class DBHandler:
                 )
             return self._postprocess_market_df(df)
         except Exception as e:
-            logger.error("Error getting market data for %s: %s", symbol, e, exc_info=True)
+            logger.error(
+                "Error getting market data for %s: %s", symbol, e, exc_info=True
+            )
             return pd.DataFrame()
 
     def _get_market_data_parquet(
@@ -296,7 +308,9 @@ class DBHandler:
         try:
             query = (
                 session.query(TradeLog)
-                .filter(TradeLog.timestamp >= start_date, TradeLog.timestamp <= end_date)
+                .filter(
+                    TradeLog.timestamp >= start_date, TradeLog.timestamp <= end_date
+                )
                 .order_by(TradeLog.timestamp)
             )
             return query.all()
@@ -354,7 +368,11 @@ class DBHandler:
             df = pd.concat([df, pd.DataFrame([trade_dict])], ignore_index=True)
             df.sort_values("timestamp", inplace=True)
             self._write_parquet_table("trade_logs", df)
-            logger.info("Logged trade %s for %s (filesystem backend).", trade.order_id, trade.symbol)
+            logger.info(
+                "Logged trade %s for %s (filesystem backend).",
+                trade.order_id,
+                trade.symbol,
+            )
             return
 
         session = self.Session()
@@ -385,7 +403,9 @@ class DBHandler:
         )
         try:
             with self.engine.connect() as conn:
-                df = pd.read_sql(query, conn, params={"start": start_date, "end": end_date})
+                df = pd.read_sql(
+                    query, conn, params={"start": start_date, "end": end_date}
+                )
             return df
         except Exception as e:
             logger.error("Error fetching trade logs as DataFrame: %s", e, exc_info=True)
@@ -408,7 +428,9 @@ class DBHandler:
         )
         try:
             with self.engine.connect() as conn:
-                df = pd.read_sql(query, conn, params={"start": start_date, "end": end_date})
+                df = pd.read_sql(
+                    query, conn, params={"start": start_date, "end": end_date}
+                )
             return df
         except Exception as e:
             logger.error(
@@ -473,7 +495,9 @@ class DBHandler:
                 try:
                     inferred = pd.infer_freq(df.index)
                     if inferred:
-                        df.index = pd.DatetimeIndex(df.index, tz=df.index.tz, freq=inferred)
+                        df.index = pd.DatetimeIndex(
+                            df.index, tz=df.index.tz, freq=inferred
+                        )
                         df.index.name = "timestamp"
                 except Exception:
                     pass
@@ -494,12 +518,18 @@ class DBHandler:
                 df = df[df.index < end_ts]
 
         if not df.empty:
-            logger.info("Loaded %d data points for %s from storage.", len(df), df.iloc[0].get("symbol", "?"))
+            logger.info(
+                "Loaded %d data points for %s from storage.",
+                len(df),
+                df.iloc[0].get("symbol", "?"),
+            )
         return df
 
     def _parquet_table_path(self, name: str) -> Path:
         if not self.storage_dir:
-            raise RuntimeError("Parquet backend not configured with a storage directory.")
+            raise RuntimeError(
+                "Parquet backend not configured with a storage directory."
+            )
         return self.storage_dir / f"{name}.parquet"
 
     def _load_parquet_table(self, name: str) -> pd.DataFrame:

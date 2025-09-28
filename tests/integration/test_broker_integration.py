@@ -26,11 +26,14 @@ if missing_creds:
     )
 
 # --- Test Logging Configuration ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
 # --- Pytest Fixtures ---
+
 
 @pytest.fixture(scope="module")
 def event_loop():
@@ -38,6 +41,7 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
 
 @pytest.fixture(scope="module")
 def broker_handler():
@@ -52,34 +56,47 @@ def broker_handler():
         handler = BrokerAPIHandler()
 
         # --- Pre-test Cleanup ---
-        logger.info("Performing pre-test cleanup: Cancelling all existing open orders...")
+        logger.info(
+            "Performing pre-test cleanup: Cancelling all existing open orders..."
+        )
         handler.cancel_all_orders()
-        time.sleep(3) # Allow time for cancellations to be processed by Alpaca
+        time.sleep(3)  # Allow time for cancellations to be processed by Alpaca
 
         yield handler
 
     except ValueError as e:
-        pytest.fail(f"FATAL: Failed to initialize BrokerAPIHandler. Check .env file and API keys. Error: {e}")
+        pytest.fail(
+            f"FATAL: Failed to initialize BrokerAPIHandler. Check .env file and API keys. Error: {e}"
+        )
 
     finally:
         # --- Post-test Teardown ---
         if handler:
-            logger.info("Performing post-test cleanup: Cancelling all remaining open orders...")
+            logger.info(
+                "Performing post-test cleanup: Cancelling all remaining open orders..."
+            )
             handler.cancel_all_orders()
             logger.info("Broker handler teardown complete.")
 
 
 # --- REST API Integration Tests ---
 
+
 async def test_connection_and_account_info(broker_handler):
     """Tests the basic API connection by fetching account information."""
     logger.info("\n--- [Test Case: Get Account Info] ---")
     account_info = broker_handler.get_account_info()
 
-    assert account_info is not None, "Failed to get account info. Check API keys and connection."
+    assert account_info is not None, (
+        "Failed to get account info. Check API keys and connection."
+    )
     assert hasattr(account_info, "id"), "Account info is missing 'id' attribute."
-    assert account_info.status == "ACTIVE", f"Account status is '{account_info.status}', not 'ACTIVE'."
-    logger.info(f"Successfully fetched account info. Account Status: {account_info.status}")
+    assert account_info.status == "ACTIVE", (
+        f"Account status is '{account_info.status}', not 'ACTIVE'."
+    )
+    logger.info(
+        f"Successfully fetched account info. Account Status: {account_info.status}"
+    )
 
 
 async def test_full_order_cycle(broker_handler):
@@ -100,7 +117,9 @@ async def test_full_order_cycle(broker_handler):
         current_price = last_quote.ap  # Current ask price
         # Set limit price 10% below the market to avoid execution
         test_limit_price = round(current_price * 0.90, 2)
-        logger.info(f"Current ask price for {symbol_to_test} is ~${current_price:.2f}. Setting limit price to ${test_limit_price}")
+        logger.info(
+            f"Current ask price for {symbol_to_test} is ~${current_price:.2f}. Setting limit price to ${test_limit_price}"
+        )
     except Exception as e:
         pytest.fail(f"Could not get latest quote for {symbol_to_test}: {e}")
 
@@ -108,19 +127,28 @@ async def test_full_order_cycle(broker_handler):
     client_order_id = f"test_cycle_{uuid.uuid4()}"
 
     order = broker_handler.place_order(
-        symbol=symbol_to_test, qty=1, side="buy", order_type="limit",
-        time_in_force="day", limit_price=test_limit_price, client_order_id=client_order_id
+        symbol=symbol_to_test,
+        qty=1,
+        side="buy",
+        order_type="limit",
+        time_in_force="day",
+        limit_price=test_limit_price,
+        client_order_id=client_order_id,
     )
     assert order is not None, "Placing buy order failed."
     assert order.client_order_id == client_order_id
-    logger.info(f"Buy order submitted. Order ID: {order.id}. Waiting for status update...")
+    logger.info(
+        f"Buy order submitted. Order ID: {order.id}. Waiting for status update..."
+    )
     await asyncio.sleep(2)
 
     # 2. Check the order status
     logger.info(f"\n[Step 2: Checking status for order {order.id}]")
     order_status = broker_handler.get_order_status(order.id)
     assert order_status is not None, f"Failed to get status for order {order.id}."
-    assert order_status.status in ["new", "accepted"], f"Order status was '{order_status.status}', not 'new' or 'accepted'."
+    assert order_status.status in ["new", "accepted"], (
+        f"Order status was '{order_status.status}', not 'new' or 'accepted'."
+    )
     logger.info(f"Order status is correctly '{order_status.status}'.")
 
     # 3. Cancel the order
@@ -134,7 +162,9 @@ async def test_full_order_cycle(broker_handler):
     logger.info(f"\n[Step 4: Verifying final status of order {order.id}]")
     final_status = broker_handler.get_order_status(order.id)
     assert final_status is not None, f"Failed to get final status for order {order.id}."
-    assert final_status.status == "canceled", f"Final order status was '{final_status.status}', not 'canceled'."
+    assert final_status.status == "canceled", (
+        f"Final order status was '{final_status.status}', not 'canceled'."
+    )
     logger.info("Order cycle test successful. Final status is 'canceled'.")
 
 
@@ -142,10 +172,14 @@ async def test_list_positions(broker_handler):
     """Tests fetching the list of all current positions in the account."""
     logger.info("\n--- [Test Case: List Positions] ---")
     positions = broker_handler.list_positions()
-    assert positions is not None, "list_positions() should return a list or empty list, not None."
+    assert positions is not None, (
+        "list_positions() should return a list or empty list, not None."
+    )
 
     if not positions:
-        logger.info("No positions currently held (as expected for a clean test account).")
+        logger.info(
+            "No positions currently held (as expected for a clean test account)."
+        )
     else:
         logger.info(f"Found {len(positions)} positions:")
         for p in positions:
@@ -153,6 +187,7 @@ async def test_list_positions(broker_handler):
 
 
 # --- WebSocket Streaming Integration Test ---
+
 
 async def test_websocket_stream_receives_data(broker_handler):
     """
@@ -174,7 +209,7 @@ async def test_websocket_stream_receives_data(broker_handler):
         symbols=[symbol_to_stream],
         trade_handler_cb=stream_callback,
         subscribe_trades=True,
-        subscribe_updates=False # Don't need order updates for this test
+        subscribe_updates=False,  # Don't need order updates for this test
     )
 
     stream_task = asyncio.create_task(broker_handler.start_streaming())
@@ -186,7 +221,9 @@ async def test_websocket_stream_receives_data(broker_handler):
         first_message = await asyncio.wait_for(received_updates.get(), timeout=15)
         logger.info(f"Successfully received first message from stream: {first_message}")
     except asyncio.TimeoutError:
-        pytest.fail("Did not receive any messages from the WebSocket stream within the timeout period.")
+        pytest.fail(
+            "Did not receive any messages from the WebSocket stream within the timeout period."
+        )
     finally:
         # Teardown: Stop the stream and cancel the background task
         await broker_handler.stop_streaming()
@@ -194,8 +231,8 @@ async def test_websocket_stream_receives_data(broker_handler):
         try:
             await stream_task
         except asyncio.CancelledError:
-            pass # This is expected
+            pass  # This is expected
 
     # Assert: Check if we received at least one message
-    assert not received_updates.empty() or 'first_message' in locals()
+    assert not received_updates.empty() or "first_message" in locals()
     logger.info("WebSocket stream test successful.")

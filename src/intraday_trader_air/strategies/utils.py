@@ -1,6 +1,5 @@
 """Small helper utilities shared by strategy implementations."""
 
-
 import backtrader.indicators as btind
 
 

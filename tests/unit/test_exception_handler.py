@@ -15,31 +15,34 @@ from intraday_trader_air.exception_handler import (
 
 # --- Pytest Fixtures ---
 
+
 @pytest.fixture
 def handler():
     """Returns a clean ExceptionHandler instance for each test."""
     return ExceptionHandler()
 
+
 @pytest.fixture
 def retry_config():
     """Returns a standard RetryConfig instance."""
-    return RetryConfig(base_delay=0.01) # Use a very small delay for fast tests
+    return RetryConfig(base_delay=0.01)  # Use a very small delay for fast tests
 
 
 # --- RetryConfig Tests ---
+
 
 def test_retry_config_exponential_backoff(retry_config):
     """Verify that the delay increases exponentially with backoff enabled."""
     retry_config.exponential_backoff = True
     retry_config.jitter = False
-    delay1 = retry_config.get_delay(0) # 2**0 * 0.01
-    delay2 = retry_config.get_delay(1) # 2**1 * 0.01
-    delay3 = retry_config.get_delay(2) # 2**2 * 0.01
+    delay1 = retry_config.get_delay(0)  # 2**0 * 0.01
+    delay2 = retry_config.get_delay(1)  # 2**1 * 0.01
+    delay3 = retry_config.get_delay(2)  # 2**2 * 0.01
 
     # We use pytest.approx because of jitter
     assert delay2 > delay1
     assert delay3 > delay2
-    assert delay2 == pytest.approx(delay1 * 2, rel=0.5) # Jitter can be up to 50%
+    assert delay2 == pytest.approx(delay1 * 2, rel=0.5)  # Jitter can be up to 50%
     assert delay3 == pytest.approx(delay2 * 2, rel=0.5)
 
 
@@ -54,6 +57,7 @@ def test_retry_config_no_backoff(retry_config):
 
 
 # --- CircuitBreaker Tests ---
+
 
 def test_circuit_breaker_trips_and_opens():
     """Verify the breaker opens after reaching the failure threshold."""
@@ -104,6 +108,7 @@ def test_circuit_breaker_resets_after_recovery():
 
 # --- ExceptionHandler Core Logic Tests ---
 
+
 def test_handle_exception_creates_record(handler):
     """Verify that handling an exception logs it correctly."""
     try:
@@ -122,10 +127,14 @@ def test_handle_exception_creates_record(handler):
 
 def test_emergency_stop_triggered_on_critical(handler):
     """Verify the emergency stop flag is set only for CRITICAL errors."""
-    handler.handle_exception(ValueError("High error"), ErrorCategory.API, ErrorSeverity.HIGH)
+    handler.handle_exception(
+        ValueError("High error"), ErrorCategory.API, ErrorSeverity.HIGH
+    )
     assert handler.emergency_stop_triggered is False
 
-    handler.handle_exception(ValueError("Critical error"), ErrorCategory.SYSTEM, ErrorSeverity.CRITICAL)
+    handler.handle_exception(
+        ValueError("Critical error"), ErrorCategory.SYSTEM, ErrorSeverity.CRITICAL
+    )
     assert handler.emergency_stop_triggered is True
 
 
@@ -135,10 +144,14 @@ def test_error_callback_is_executed(handler):
     handler.register_error_callback(ErrorCategory.NETWORK, callback_mock)
 
     # Handle a network error
-    handler.handle_exception(ConnectionError("Timeout"), ErrorCategory.NETWORK, ErrorSeverity.MEDIUM)
+    handler.handle_exception(
+        ConnectionError("Timeout"), ErrorCategory.NETWORK, ErrorSeverity.MEDIUM
+    )
 
     # Handle a different category of error
-    handler.handle_exception(ValueError("Bad param"), ErrorCategory.API, ErrorSeverity.LOW)
+    handler.handle_exception(
+        ValueError("Bad param"), ErrorCategory.API, ErrorSeverity.LOW
+    )
 
     # The callback should have been called exactly once with the network error record
     callback_mock.assert_called_once()
@@ -147,8 +160,10 @@ def test_error_callback_is_executed(handler):
 
 # --- Decorator and Retry Logic Tests ---
 
+
 class MockTrader:
     """A mock class to test the decorator's ability to access the handler."""
+
     def __init__(self, handler):
         self.exception_handler = handler
         self.call_count = 0
@@ -160,7 +175,9 @@ class MockTrader:
             raise ValueError("API is down")
         return "Success"
 
-    @handle_exceptions(category=ErrorCategory.SYSTEM, retry=False, default_return="Default")
+    @handle_exceptions(
+        category=ErrorCategory.SYSTEM, retry=False, default_return="Default"
+    )
     def fail_once_no_retry(self):
         raise SystemError("System failed")
 
@@ -168,7 +185,9 @@ class MockTrader:
 def test_handle_exceptions_decorator_with_retry(handler, caplog):
     """Verify the retry decorator re-executes the function until it succeeds."""
     # Configure a fast retry for the test
-    handler.retry_configs[ErrorCategory.API] = RetryConfig(max_retries=3, base_delay=0.01)
+    handler.retry_configs[ErrorCategory.API] = RetryConfig(
+        max_retries=3, base_delay=0.01
+    )
 
     trader = MockTrader(handler)
     with caplog.at_level("WARNING"):
@@ -189,29 +208,34 @@ def test_handle_exceptions_decorator_no_retry(handler):
     assert result == "Default"
     # One error should be logged
     assert len(handler.error_records) == 1
-    assert handler.error_records[0].error_type == 'SystemError'
+    assert handler.error_records[0].error_type == "SystemError"
 
 
 # --- Reporting and State Management Tests ---
 
+
 def test_get_error_statistics(handler):
     """Verify the statistics report aggregates errors correctly."""
-    handler.handle_exception(ConnectionError(), ErrorCategory.NETWORK, ErrorSeverity.MEDIUM)
+    handler.handle_exception(
+        ConnectionError(), ErrorCategory.NETWORK, ErrorSeverity.MEDIUM
+    )
     handler.handle_exception(ValueError(), ErrorCategory.API, ErrorSeverity.LOW)
     handler.handle_exception(ValueError(), ErrorCategory.API, ErrorSeverity.LOW)
 
     stats = handler.get_error_statistics()
 
-    assert stats['total_errors'] == 3
-    assert stats['category_breakdown']['network']['count'] == 1
-    assert stats['category_breakdown']['api']['count'] == 2
-    assert stats['severity_breakdown']['low'] == 2
-    assert stats['severity_breakdown']['medium'] == 1
+    assert stats["total_errors"] == 3
+    assert stats["category_breakdown"]["network"]["count"] == 1
+    assert stats["category_breakdown"]["api"]["count"] == 2
+    assert stats["severity_breakdown"]["low"] == 2
+    assert stats["severity_breakdown"]["medium"] == 1
 
 
 def test_export_error_log(handler, tmp_path):
     """Verify that an error log can be exported to a JSON file."""
-    handler.handle_exception(TypeError("Bad type"), ErrorCategory.STRATEGY, ErrorSeverity.HIGH)
+    handler.handle_exception(
+        TypeError("Bad type"), ErrorCategory.STRATEGY, ErrorSeverity.HIGH
+    )
 
     file_path = tmp_path / "error_log.json"
     handler.export_error_log(str(file_path))
@@ -221,4 +245,4 @@ def test_export_error_log(handler, tmp_path):
         data = json.load(f)
 
     assert len(data) == 1
-    assert data[0]['error_type'] == 'TypeError'
+    assert data[0]["error_type"] == "TypeError"

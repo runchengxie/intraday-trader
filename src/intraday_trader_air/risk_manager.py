@@ -17,8 +17,8 @@ class RiskManager:
         self.config = risk_config
 
         # VaR parameters
-        self.var_window = self.config.get('var_window', 252)
-        self.var_confidence = self.config.get('var_confidence_level', 0.05)
+        self.var_window = self.config.get("var_window", 252)
+        self.var_confidence = self.config.get("var_confidence_level", 0.05)
 
         # Data history deques
         self.price_history = deque(maxlen=self.var_window)
@@ -26,13 +26,13 @@ class RiskManager:
         self.returns_history = deque(maxlen=self.var_window)
 
         # Anomaly detection thresholds from config
-        self.price_jump_threshold = self.config.get('price_jump_threshold', 0.05)
-        self.volume_spike_threshold = self.config.get('volume_spike_threshold', 3.0)
-        self.min_liquidity_volume = self.config.get('min_liquidity_volume', 1000)
+        self.price_jump_threshold = self.config.get("price_jump_threshold", 0.05)
+        self.volume_spike_threshold = self.config.get("volume_spike_threshold", 3.0)
+        self.min_liquidity_volume = self.config.get("min_liquidity_volume", 1000)
 
         logger.info(
             f"RiskManager initialized with config: VaR window={self.var_window}, "
-            f"confidence level={1-self.var_confidence:.1%}, "
+            f"confidence level={1 - self.var_confidence:.1%}, "
             f"Max Participation={self.config.get('max_order_participation_ratio', 'N/A')}, "
             f"Max Gross Exposure={self.config.get('max_gross_exposure', 'N/A')}"
         )
@@ -100,10 +100,10 @@ class RiskManager:
             if volume > avg_volume * self.volume_spike_threshold:
                 alerts["volume_spike_alert"] = True
                 alerts["messages"].append(
-                    f"Unusual volume spike: {volume/avg_volume:.1f}x the average"
+                    f"Unusual volume spike: {volume / avg_volume:.1f}x the average"
                 )
                 logger.warning(
-                    f"Volume spike detected: {volume/avg_volume:.1f}x the average volume"
+                    f"Volume spike detected: {volume / avg_volume:.1f}x the average volume"
                 )
 
         # 3. Liquidity check
@@ -244,7 +244,9 @@ class RiskManager:
             )
             details["estimated_impact_pct"] = estimated_impact_pct
 
-            lookback_prices = [price for price in list(self.price_history)[-5:] if price is not None]
+            lookback_prices = [
+                price for price in list(self.price_history)[-5:] if price is not None
+            ]
             if lookback_prices:
                 avg_price = float(np.mean(lookback_prices))
                 details["total_estimated_impact_cost"] = (
@@ -309,7 +311,9 @@ class RiskManager:
             )
 
         if not passed:
-            logger.warning(f"Leverage/Exposure check FAILED. Reasons: {'; '.join(warnings)}")
+            logger.warning(
+                f"Leverage/Exposure check FAILED. Reasons: {'; '.join(warnings)}"
+            )
 
         return passed, warnings
 
@@ -456,7 +460,7 @@ class RiskManager:
             avg_volume = np.mean(list(self.volume_history)[-5:])
             if volume > avg_volume * 10:  # 10x spike
                 validation["warnings"].append(
-                    f"Unusual volume spike: {volume/avg_volume:.1f}x the recent average"
+                    f"Unusual volume spike: {volume / avg_volume:.1f}x the recent average"
                 )
 
         return validation

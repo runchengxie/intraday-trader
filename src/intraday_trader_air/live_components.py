@@ -181,16 +181,23 @@ class TradingState:
         self.cash = cash  # Update cash for portfolio calculation
         logger.debug(f"Updated account state: Cash={cash}, PortfolioValue={value}")
 
-    def set_active_order(self, order_id: str | None, client_order_id: str | None = None):
-        logger.info(f"Setting active order ID to: {order_id}, client_order_id: {client_order_id}")
+    def set_active_order(
+        self, order_id: str | None, client_order_id: str | None = None
+    ):
+        logger.info(
+            f"Setting active order ID to: {order_id}, client_order_id: {client_order_id}"
+        )
         self.active_order_id = order_id
         self.active_order_client_id = client_order_id
         # Reset stream status when setting new order
         self.last_known_stream_status = None
 
-    def update_stream_order_status(self, order_id: str, status: str, timestamp: float = None):
+    def update_stream_order_status(
+        self, order_id: str, status: str, timestamp: float = None
+    ):
         """Update the last known order status from WebSocket stream"""
         import time
+
         if timestamp is None:
             timestamp = time.time()
 
@@ -200,15 +207,19 @@ class TradingState:
             self.last_stream_update_time = timestamp
 
             # Track status history for debugging
-            self.order_status_history.append({
-                'timestamp': timestamp,
-                'order_id': order_id,
-                'old_status': old_status,
-                'new_status': status,
-                'source': 'websocket'
-            })
+            self.order_status_history.append(
+                {
+                    "timestamp": timestamp,
+                    "order_id": order_id,
+                    "old_status": old_status,
+                    "new_status": status,
+                    "source": "websocket",
+                }
+            )
 
-            logger.debug(f"Updated stream status for order {order_id}: {old_status} -> {status}")
+            logger.debug(
+                f"Updated stream status for order {order_id}: {old_status} -> {status}"
+            )
 
     def clear_active_order(self):
         """Clear active order tracking when order is completed"""

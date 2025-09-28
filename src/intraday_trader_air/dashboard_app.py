@@ -80,7 +80,7 @@ else:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Return", f"{total_return_pct:.2f}%")
     col2.metric("Sharpe Ratio", f"{risk_metrics.get('sharpe_ratio', 0):.2f}")
-    col3.metric("Max Drawdown", f"{risk_metrics.get('max_drawdown', 0)*100:.2f}%")
+    col3.metric("Max Drawdown", f"{risk_metrics.get('max_drawdown', 0) * 100:.2f}%")
     col4.metric("Daily VaR (95%)", f"${var_result.get('var', 0):,.2f}")
 
     # --- Display charts ---
