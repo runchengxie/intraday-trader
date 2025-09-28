@@ -279,7 +279,8 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 ## 项目结构
 
-```
+```tree
+.
 ├── src/patf_trading_framework/   # 核心代码（策略、数据、风险、实盘引擎）
 │   └── strategies/               # 策略包（含基类、注册表与具体策略实现）
 ├── tests/                        # 单元测试与集成测试
