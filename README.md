@@ -148,7 +148,7 @@ flowchart LR
    uv pip install -e .
    ```
 
-   `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。
+   `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。默认情况下 `uv` 会忽略当前 shell 已激活的其他虚拟环境并使用项目根目录下的 `.venv`；若确实希望复用已激活环境，可在命令后加上 `--active`。
 
 3. 配置凭证
 
@@ -176,6 +176,24 @@ flowchart LR
 
    * 启动仪表盘：`intraday dashboard`
 
+   #### 回测/优化常用参数
+
+   * 默认情况下，`intraday backtest run` 会先运行买入持有基准，再依次执行配置文件中的全部策略。如果希望只测试部分策略，可多次传入 `--strategy`：
+
+     ```bash
+     intraday backtest run --strategy ema_crossover --strategy mean_reversion
+     ```
+
+   * 若只想生成买入持有序列，可使用 `intraday backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
+
+     ```bash
+     intraday backtest run --no-benchmark
+     ```
+
+   * `intraday backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
+
+   * 回测、优化和数据更新命令会将日志写入 `output/logs`，图表输出至 `output/charts`（可在 `config.yml` 的 `paths` 段自定义）。
+
    若需仪表盘，安装时请带上 `dashboard` 可选依赖：
 
    ```bash
@@ -187,14 +205,19 @@ flowchart LR
 ### 常用 Make 命令
 
 ```bash
-make help           # 查看所有常用命令
-make backtest       # 本地回测
-make update         # 更新数据缓存
-make fmt            # 使用 Ruff Formatter 自动格式化
-make coverage       # 运行 pytest 并输出覆盖率
-make docker-live    # 容器模式启动交易服务 + DB
-make docker-db      # 仅启动 TimescaleDB（容器）
+make help                # 查看所有常用命令
+make sync                # 安装/同步依赖（默认使用项目内 .venv）
+make backtest ARGS='…'   # 本地回测，可通过 ARGS 透传 --strategy 等参数
+make optimise ARGS='…'   # 仅对选定策略执行参数搜索
+make benchmark           # 单独生成买入持有基准
+make update              # 更新数据缓存
+make fmt                 # 使用 Ruff Formatter 自动格式化
+make coverage            # 运行 pytest 并输出覆盖率
+make docker-live         # 容器模式启动交易服务 + DB
+make docker-db           # 仅启动 TimescaleDB（容器）
 ```
+
+如需使用当前已激活的虚拟环境运行 `make` 目标，可附加 `USE_ACTIVE=1`：`make backtest USE_ACTIVE=1`。
 
 ## CLI 命令手册
 
