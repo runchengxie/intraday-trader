@@ -20,7 +20,7 @@
 ### 已覆盖的运行场景
 | 场景 | 推荐方式 | 说明 |
 | --- | --- | --- |
-| 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .[dev]` 后即可使用 CLI，启动速度最快。 |
+| 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .` 后即可使用 CLI，默认包含开发工具链。 |
 | 需要 TimescaleDB、长期运行或团队协作 | Docker（`--profile live`） | 容器一次性拉起交易服务与 TimescaleDB，环境完全可复现。 |
 | 只想调试数据库或接入 BI 工具 | Docker（`--profile db`） | 单独启动 TimescaleDB，供本地脚本或 BI 工具连接。 |
 
@@ -119,9 +119,9 @@ flowchart LR
 2. **安装依赖并注册 CLI 命令**
    ```bash
    uv sync
-   uv pip install -e .[dev]
+   uv pip install -e .
    ```
-   `.[dev]` 会额外拉取测试、lint 与 Jupyter 依赖，便于本地调试。如果只想安装最小集，可改为 `uv pip install -e .`。
+   `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。
 3. **配置凭证**
    将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
    ```bash
@@ -164,7 +164,7 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 
 ## 配置、环境与密钥管理
 
-- `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `NO_DEV=1` 禁用开发依赖。
+- `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `UV_NO_DEV=1` 禁用开发依赖。
 - `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。
 - Docker 场景：`docker-compose.yml` 会把主机的环境变量透传给交易容器，并通过卷挂载持久化输出目录；TimescaleDB 密码同样从 `.env` 自动注入。
 - 安全提醒：永远不要把密钥写入版本库，可将 `.env`、`.envrc` 保持在本地，同时利用 `.dockerignore` 避免构建镜像时打包敏感文件。
