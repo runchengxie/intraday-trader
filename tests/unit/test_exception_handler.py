@@ -46,9 +46,10 @@ def test_retry_config_exponential_backoff(retry_config):
 def test_retry_config_no_backoff(retry_config):
     """Verify that the delay remains constant with backoff disabled."""
     retry_config.exponential_backoff = False
+    retry_config.jitter = False
     delay1 = retry_config.get_delay(0)
     delay2 = retry_config.get_delay(1)
-    
+
     assert delay1 == pytest.approx(delay2, rel=0.5)
 
 

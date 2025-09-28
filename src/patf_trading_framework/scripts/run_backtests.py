@@ -16,7 +16,7 @@ from urllib3.util.retry import Retry
 logger = logging.getLogger(__name__)
 
 # Import functions and classes from the modules
-from patf_trading_framework import strategies
+from patf_trading_framework.strategies import REGISTRY
 from patf_trading_framework.backtest_utils import analyze_optimization_results
 from patf_trading_framework.data_utils import (
     apply_kalman_filter,
@@ -68,9 +68,13 @@ def load_config(config_path):
 def get_strategy_class(class_name_str):
     """Dynamically get strategy class from string"""
     try:
-        return getattr(strategies, class_name_str)
-    except AttributeError:
-        logger.error(f"Strategy class '{class_name_str}' not found in strategies.py!")
+        return REGISTRY[class_name_str]
+    except KeyError:
+        logger.error(
+            "Strategy class '%s' not found. Available options: %s",
+            class_name_str,
+            ", ".join(sorted(REGISTRY.keys())),
+        )
         sys.exit(1)
 
 
