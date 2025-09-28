@@ -41,8 +41,7 @@ EXCLUDE_DIRS_ROOT_ONLY: set[str] = {
     "project_tools",
     "tests",
     ".ruff_cache",
-    "docs",
-#     "notebooks",
+#     "docs",
 }
 
 # Directory name patterns to exclude (e.g., any directory ending with .egg-info).

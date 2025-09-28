@@ -64,8 +64,6 @@ dev = [
     "pytest-cov",
     "ruff",
     "pre-commit",
-    "jupyterlab",
-    "ipykernel",
 ]
 
 # Define script entry points, allowing them to be run from the command line after installation.
