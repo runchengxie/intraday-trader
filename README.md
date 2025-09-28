@@ -162,46 +162,50 @@ flowchart LR
 
 4. 运行命令行工具
 
-   * 更新行情数据：`intraday update-data`
+  * 更新行情数据：`intraday update-data`
 
-   * 回测策略：`intraday backtest run`
+  * 回补缺失行情字段：`intraday data backfill --fields trade_count,vwap`
 
-   * 参数优化：`intraday backtest optimise`
+  * 回测策略：`intraday backtest run`
 
-   * 基准对比：`intraday backtest benchmark`
+  * 参数优化：`intraday backtest optimise`
 
-   * 生成报表：`intraday generate-report`
+  * 基准对比：`intraday backtest benchmark`
 
-   * 启动纸上交易：`intraday live`
+  * 生成报表：`intraday generate-report`
 
-   * 启动仪表盘：`intraday dashboard`
+  * 启动纸上交易：`intraday live`
+
+  * 启动仪表盘：`intraday dashboard`
 
    #### 回测/优化常用参数
 
    * 默认情况下，`intraday backtest run` 会先运行买入持有基准，再依次执行配置文件中的全部策略。如果希望只测试部分策略，可多次传入 `--strategy`：
 
-     ```bash
-     # 在不指定选项的时候将同时完成三个策略和benchmark的回测
-     backtest run
+    ```bash
+    # 在不指定选项的时候将同时完成三个策略和 benchmark 的回测
+    intraday backtest run
 
-     # 只运行ema_crossover策略
-     backtest run --strategy ema_crossover
+    # 只运行 ema_crossover 策略
+    intraday backtest run --strategy ema_crossover
 
-     # 只运行mean_reversion策略
-     backtest run --strategy mean_reversion
+    # 只运行 mean_reversion 策略
+    intraday backtest run --strategy mean_reversion
 
-     # 只运行custom_ratio策略
-     backtest run --strategy custom_ratio
+    # 只运行 custom_ratio 策略
+    intraday backtest run --strategy custom_ratio
 
-     # 指定同时跑多个策略的回测
-     backtest run --strategy ema_crossover --strategy mean_reversion
-     ```
+    # 指定同时跑多个策略的回测
+    intraday backtest run --strategy ema_crossover --strategy mean_reversion
+    ```
 
-   * 若只想生成买入持有序列，可使用 `intraday backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
+  * 若只想生成买入持有序列，可使用 `intraday backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
 
-     ```bash
+    ```bash
      intraday backtest run --no-benchmark
-     ```
+    ```
+
+  * 若希望回测阶段严格要求 `trade_count` 与 `vwap` 均来自数据库缓存，可在 `config.yml` 的 `data.require_full_fields` 字段设置为 `true`。若验证失败，CLI 会提示先执行 `intraday data backfill` 以补齐历史缺失列。
 
    * `intraday backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
 

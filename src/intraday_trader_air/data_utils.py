@@ -180,6 +180,49 @@ def _cache_data(df: pd.DataFrame, cache_filepath: str) -> None:
         logger.warning("Error caching data: %s", exc)
 
 
+def ensure_price_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure optional quote fields exist before persistence or analysis."""
+
+    if df is None or df.empty:
+        return df
+
+    ensured = df.copy()
+    if "trade_count" not in ensured.columns:
+        ensured["trade_count"] = 0
+    if "vwap" not in ensured.columns:
+        ensured["vwap"] = (
+            ensured["high"].astype(float)
+            + ensured["low"].astype(float)
+            + ensured["close"].astype(float)
+        ) / 3.0
+    return ensured
+
+
+def fetch_api_bars(
+    api,
+    symbol: str,
+    timeframe,
+    start_date: str,
+    end_date: str,
+    adjustment: str = "raw",
+) -> pd.DataFrame | None:
+    """Fetch historical bars straight from the API with normalization."""
+
+    bars = _fetch_from_api(
+        api,
+        symbol,
+        timeframe,
+        start_date,
+        end_date,
+        adjustment=adjustment,
+    )
+    if bars is None or getattr(bars, "empty", False):
+        return None
+
+    normalised = _normalize_index_and_clip(bars, start_date, end_date)
+    return ensure_price_columns(normalised)
+
+
 def fetch_historical_data(
     api,
     symbol,
@@ -221,6 +264,8 @@ def fetch_historical_data(
     if bars is None or bars.empty:
         logger.warning("No data retrieved for %s after applying filters.", symbol)
         return None
+
+    bars = ensure_price_columns(bars)
 
     if data_source == "api":
         if db_handler:

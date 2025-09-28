@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 import backtrader as bt
 import pandas as pd
@@ -149,6 +149,84 @@ def _create_alpaca_client() -> REST:
     return client
 
 
+def _resample_price_data(
+    bars: pd.DataFrame, frequency: str, require_full_fields: bool
+) -> pd.DataFrame:
+    """Resample raw minute data into the configured timeframe.
+
+    The helper gracefully degrades when ``trade_count`` or ``vwap`` columns are
+    missing in cached datasets by reconstructing a volume-weighted average price
+    from the available OHLC data.  When ``require_full_fields`` is enabled the
+    function raises instead of silently backfilling so that operators can run a
+    data backfill.
+    """
+
+    if bars.empty:
+        return bars
+
+    working = bars.copy()
+
+    for column in ("open", "high", "low", "close", "volume"):
+        if column not in working.columns:
+            raise SystemExit(f"Input data is missing required column '{column}'")
+
+    aggregation: dict[str, str] = {
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum",
+    }
+
+    if "trade_count" in working.columns:
+        aggregation["trade_count"] = "sum"
+    else:
+        _LOGGER.warning(
+            "trade_count column missing in source data; leaving values as NA "
+            "after resample",
+        )
+
+    if "vwap" in working.columns:
+        price_basis = working["vwap"].astype(float)
+    else:
+        _LOGGER.warning(
+            "VWAP column missing in source data; approximating using typical price"
+        )
+        price_basis = (
+            working["high"].astype(float)
+            + working["low"].astype(float)
+            + working["close"].astype(float)
+        ) / 3.0
+
+    working["__dollar_volume__"] = price_basis * working["volume"].astype(float)
+
+    resampled = (
+        working.resample(frequency, label="right", closed="right")
+        .agg({**aggregation, "__dollar_volume__": "sum"})
+        .dropna(subset=["open", "high", "low", "close", "volume"], how="any")
+    )
+
+    with pd.option_context("mode.use_inf_as_na", True):
+        resampled["vwap"] = resampled["__dollar_volume__"] / resampled["volume"]
+
+    resampled.drop(columns="__dollar_volume__", inplace=True)
+
+    if "trade_count" not in resampled.columns:
+        resampled["trade_count"] = pd.NA
+
+    if require_full_fields:
+        required = ("vwap", "trade_count")
+        missing = [col for col in required if resampled[col].isna().all()]
+        if missing:
+            raise SystemExit(
+                "Resampled dataset is missing required columns: "
+                + ", ".join(missing)
+                + ". Run 'intraday data backfill' to populate them."
+            )
+
+    return resampled
+
+
 def _load_price_frame(
     config: AppConfig,
     api: REST,
@@ -175,25 +253,16 @@ def _load_price_frame(
 
     if bars is None or bars.empty:
         raise SystemExit(
-            f"Unable to fetch market data for {config.data.ticker}. Check configuration."
+            f"Unable to fetch market data for {config.data.ticker}. "
+            "Check configuration.",
         )
 
     _LOGGER.debug("Raw data preview:\n%s", bars.head())
 
-    resampled = (
-        bars.resample(config.data.resample_frequency, label="right", closed="right")
-        .agg(
-            {
-                "open": "first",
-                "high": "max",
-                "low": "min",
-                "close": "last",
-                "volume": "sum",
-                "trade_count": "sum",
-                "vwap": "mean",
-            }
-        )
-        .dropna()
+    resampled = _resample_price_data(
+        bars,
+        config.data.resample_frequency,
+        config.data.require_full_fields,
     )
 
     if resampled.empty:

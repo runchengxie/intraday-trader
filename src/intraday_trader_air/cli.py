@@ -20,6 +20,10 @@ _SIMPLE_COMMANDS = {
     "dashboard": "intraday_trader_air.scripts.run_dashboard:main",
 }
 
+_DATA_COMMANDS = {
+    "backfill": "intraday_trader_air.scripts.run_backfill_data:main",
+}
+
 
 class CommandNotFoundError(RuntimeError):
     """Raised when a user invokes an unknown Intraday Trader Air subcommand."""
@@ -60,6 +64,17 @@ def _build_parser() -> argparse.ArgumentParser:
         simple = subparsers.add_parser(name, add_help=False)
         simple.add_argument("args", nargs=argparse.REMAINDER)
         simple.set_defaults(target=target)
+
+    data_parser = subparsers.add_parser(
+        "data",
+        help="Data maintenance utilities (backfill, migrations)",
+    )
+    data_subparsers = data_parser.add_subparsers(dest="data_command")
+
+    for name, target in _DATA_COMMANDS.items():
+        sub = data_subparsers.add_parser(name, add_help=False)
+        sub.add_argument("args", nargs=argparse.REMAINDER)
+        sub.set_defaults(target=target)
 
     return parser
 
