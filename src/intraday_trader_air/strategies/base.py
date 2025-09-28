@@ -81,6 +81,7 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
         ("use_filtered_price", False),
         ("printlog", False),
         ("force_exit_on_last_bar", False),
+        ("size_pct", None),
     )
 
     def __init__(self):
@@ -188,8 +189,13 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
             price = self.compute_limit_price(direction, limit_offset_pct)
             kwargs["exectype"] = bt.Order.Limit
             kwargs["price"] = price
-        if size is not None:
-            kwargs["size"] = size
+        computed_size = size if size is not None else self._default_position_size(direction)
+        if computed_size == 0:
+            self.log(
+                "Skipping order because computed size is zero; check size_pct and available cash."
+            )
+            return None
+        kwargs["size"] = computed_size
 
         if direction > 0:
             return self.buy(**kwargs)
@@ -201,6 +207,37 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
         offset = abs(limit_offset_pct)
         base_price = self.dataclose[0]
         return base_price * (1 + offset) if direction > 0 else base_price * (1 - offset)
+
+    def _default_position_size(self, direction: int) -> int:
+        """Calculate the default position size using ``size_pct`` of capital."""
+
+        if self.p.size_pct is None:
+            return 1 if direction > 0 else -1
+
+        try:
+            price = float(self.dataclose[0])
+        except Exception:
+            return 0
+
+        if price <= 0:
+            return 0
+
+        alloc_pct = max(0.0, float(self.p.size_pct))
+        if alloc_pct == 0.0:
+            return 0
+
+        if direction > 0:
+            cash = float(self.broker.getcash())
+            target_value = cash * min(alloc_pct, 1.0)
+            size = int(target_value / price)
+        else:
+            portfolio_value = float(self.broker.getvalue())
+            target_value = portfolio_value * min(alloc_pct, 1.0)
+            size = int(target_value / price)
+
+        if size <= 0:
+            return 0
+        return size if direction > 0 else -size
 
     # ------------------------------------------------------------------
     # Core template method
