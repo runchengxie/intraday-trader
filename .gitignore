@@ -23,7 +23,6 @@ __pycache__/
 # Miscellaneous / debugging and GENERATED OUTPUT
 full_project_source.txt
 /output/
-tools/combine_code.py
 
 # Vercel-specific configuration
 .vercel/
