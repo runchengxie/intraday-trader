@@ -293,7 +293,6 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 │   └── strategies/               # 策略包（含基类、注册表与具体策略实现）
 ├── tests/                        # 单元测试与集成测试
 ├── docs/                         # 文档与设计说明
-├── notebooks/                    # Jupyter/研究用脚本
 ├── project_tools/                # 开发工具与辅助脚本
 ├── Makefile                      # 本地与 Docker 工作流统一入口
 ├── config.yml                    # 全局配置（策略参数、数据源、数据库）
