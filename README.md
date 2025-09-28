@@ -181,13 +181,19 @@ flowchart LR
    * 默认情况下，`intraday backtest run` 会先运行买入持有基准，再依次执行配置文件中的全部策略。如果希望只测试部分策略，可多次传入 `--strategy`：
 
      ```bash
-     # 只运行 ema_crossover 策略
+     # 在不指定选项的时候将同时完成三个策略和benchmark的回测
+     intraday backtest run
+
+     # 只运行ema_crossover策略
      intraday backtest run --strategy ema_crossover
 
-     # 只运行 mean_reversion 策略
+     # 只运行mean_reversion策略
      intraday backtest run --strategy mean_reversion
 
-     # 同时跑多个策略的回测
+     # 只运行custom_ratio策略
+     intraday backtest run --strategy custom_ratio
+
+     # 指定同时跑多个策略的回测
      intraday backtest run --strategy ema_crossover --strategy mean_reversion
      ```
 
