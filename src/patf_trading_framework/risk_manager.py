@@ -183,8 +183,8 @@ class RiskManager:
     def check_liquidity_and_impact(
         self,
         order_size: float,
-        recent_avg_volume: float,
-        current_volatility: float,
+        recent_avg_volume: float | None,
+        current_volatility: float | None,
         bid_ask_spread_pct: float | None = None,
     ) -> tuple[bool, dict]:
         """
@@ -199,49 +199,63 @@ class RiskManager:
         Returns:
             Tuple[bool, Dict]: A tuple containing a boolean (True if passed) and a details dictionary.
         """
-        warnings = []
+        details = {
+            "warnings": [],
+            "participation_ratio": 0.0,
+            "estimated_impact_pct": 0.0,
+            "total_estimated_impact_cost": 0.0,
+        }
         passed = True
 
-        # 1. Volume Participation Filter
         max_participation_ratio = self.config.get("max_order_participation_ratio", 0.02)
-        if recent_avg_volume > 0:
-            participation_ratio = abs(order_size) / recent_avg_volume
+        if recent_avg_volume and recent_avg_volume > 0:
+            participation_ratio = abs(order_size) / max(recent_avg_volume, 1.0)
+            details["participation_ratio"] = float(participation_ratio)
             if participation_ratio > max_participation_ratio:
                 passed = False
-                warnings.append(
-                    f"Order rejected: Participation ratio {participation_ratio:.2%} "
-                    f"exceeds limit of {max_participation_ratio:.2%}."
+                details["warnings"].append(
+                    f"Order rejected: Participation ratio {participation_ratio:.2%} exceeds limit of {max_participation_ratio:.2%}."
                 )
+        else:
+            passed = False
+            details["warnings"].append("Order rejected: No reliable recent average volume available.")
 
-        # 2. Bid-Ask Spread Filter
         if bid_ask_spread_pct is not None:
             max_spread = self.config.get("max_bid_ask_spread_pct", 0.005)
             if bid_ask_spread_pct > max_spread:
                 passed = False
-                warnings.append(
-                    f"Order rejected: Bid-ask spread {bid_ask_spread_pct:.3%} "
-                    f"exceeds limit of {max_spread:.3%}."
+                details["warnings"].append(
+                    f"Order rejected: Bid-ask spread {bid_ask_spread_pct:.3%} exceeds limit of {max_spread:.3%}."
                 )
 
-        # 3. Market Impact Cost Estimation (Square Root Model)
-        # Formula: Impact_Cost_Per_Share = C * Volatility * sqrt(Order_Size / Avg_Volume)
         impact_coefficient = self.config.get("market_impact_coefficient", 0.5)
-        estimated_impact_pct = 0.0
-        if recent_avg_volume > 0 and current_volatility > 0:
-            estimated_impact_pct = impact_coefficient * current_volatility * \
-                                   np.sqrt(abs(order_size) / recent_avg_volume)
+        if (
+            recent_avg_volume
+            and recent_avg_volume > 0
+            and current_volatility
+            and current_volatility > 0
+        ):
+            estimated_impact_pct = float(
+                impact_coefficient
+                * current_volatility
+                * np.sqrt(abs(order_size) / recent_avg_volume)
+            )
+            details["estimated_impact_pct"] = estimated_impact_pct
 
-        total_estimated_impact_cost = estimated_impact_pct * abs(order_size) * np.mean(list(self.price_history)[-5:])
+            lookback_prices = [price for price in list(self.price_history)[-5:] if price is not None]
+            if lookback_prices:
+                avg_price = float(np.mean(lookback_prices))
+                details["total_estimated_impact_cost"] = (
+                    estimated_impact_pct * abs(order_size) * avg_price
+                )
 
         if not passed:
-            logger.warning(f"Liquidity/Impact check FAILED. Reasons: {'; '.join(warnings)}")
+            logger.warning(
+                "Liquidity/Impact check FAILED. Reasons: %s",
+                "; ".join(details["warnings"]),
+            )
 
-        return passed, {
-            "warnings": warnings,
-            "participation_ratio": participation_ratio if 'participation_ratio' in locals() else 0,
-            "estimated_impact_pct": estimated_impact_pct,
-            "total_estimated_impact_cost": total_estimated_impact_cost,
-        }
+        return passed, details
 
     # --- Leverage and Exposure Check ---
     def check_leverage_and_exposure(

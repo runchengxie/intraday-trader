@@ -81,16 +81,19 @@ def run_backtest(
     commission,
     slippage_perc=0.0,
     risk_config=None,
-    single_run_params={},
+    single_run_params=None,
     optimize=False,
     opt_param_names=None,
-    opt_param_values={},
+    opt_param_values=None,
     strategy_name="Strategy",
     maxcpus=1,
     enable_enhanced_features=True,
 ):
     """Runs a single backtest or parameter optimization for a given strategy."""
     logger = logging.getLogger(__name__)
+
+    single_run_params = {} if single_run_params is None else dict(single_run_params)
+    opt_param_values = {} if opt_param_values is None else dict(opt_param_values)
 
     # Initialize enhanced feature components
     risk_manager = None
