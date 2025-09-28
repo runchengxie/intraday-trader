@@ -103,6 +103,7 @@ flowchart LR
    docker compose --profile live up trading-bot
    ```
    `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
+   Docker Compose 会自动将数据库连接字段（`DB_BACKEND=postgresql` 以及 `DB_HOST/PORT/USER/PASSWORD/NAME`）注入交易容器，对应的 `config.yml` 会读取这些环境变量完成 TimescaleDB 对接。
 
 ### 方式二：本地 Python 环境
 
@@ -136,6 +137,14 @@ flowchart LR
    - 启动纸上交易：`patf run-live`
    - 启动仪表盘：`patf run-dashboard`
 
+   若需仪表盘，安装时请带上 `dashboard` 可选依赖：
+
+   ```bash
+   uv pip install -e '.[dashboard]'
+   # 或
+   pip install -e '.[dashboard]'
+   ```
+
 ### 常用 Make 命令
 ```bash
 make help           # 查看所有常用命令
@@ -165,7 +174,7 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 ## 配置、环境与密钥管理
 
 - `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `UV_NO_DEV=1` 禁用开发依赖。
-- `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。
+- `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。数据库段默认回落到本地 SQLite，当注入 `DB_BACKEND=postgresql` 时则使用 `DB_HOST/PORT/USER/PASSWORD/NAME` 与 TimescaleDB 建立连接。
 - Docker 场景：`docker-compose.yml` 会把主机的环境变量透传给交易容器，并通过卷挂载持久化输出目录；TimescaleDB 密码同样从 `.env` 自动注入。
 - 安全提醒：永远不要把密钥写入版本库，可将 `.env`、`.envrc` 保持在本地，同时利用 `.dockerignore` 避免构建镜像时打包敏感文件。
 
@@ -234,7 +243,7 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 2. **Alpaca 账号必须是真实资金吗？** 不需要。推荐使用 Alpaca Paper Trading（模拟账户）完成联调。
 3. **Docker 是必须的吗？** 不是。Docker 仅提供可复现环境，本地虚拟环境照样可以直接运行脚本。
 4. **如何扩展新策略？** 在 `src/patf_trading_framework/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
-5. **如何切换数据存储后端？** 编辑 `config.yml` 的 `database` 配置块即可，例如：
-   - `sqlite:///output/trading.db`
-   - `parquet://output/cache`
-   - `postgresql+psycopg2://user:pass@host:5432/dbname`
+5. **如何切换数据存储后端？** 编辑 `config.yml` 的 `database` 配置块即可。示例：
+   - 使用 SQLite：保持默认 `backend: sqlite` 与 `path: output/trading.db`
+   - 使用 Parquet：设置 `backend: parquet` 并调整 `path`
+   - 使用 TimescaleDB/PostgreSQL：设置 `backend: postgresql`，并通过环境变量或直接在配置中补充 `host/port/user/password/dbname`
