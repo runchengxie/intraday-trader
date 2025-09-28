@@ -1,23 +1,28 @@
 # Python 算法交易框架（中文指南）
 
-本项目是一个现代化、可安装的 Python 框架，用于开发、回测与部署算法交易策略。默认采用轻量级的 SQLite 缓存，方便在本地快速迭代；当需要更高性能或横向扩展时，可以无缝切换到 TimescaleDB。框架还提供风险管理、绩效分析以及 Alpaca 纸上交易 API 的接入工具。
+本项目提供一个现代化、可安装的 Python 框架，用于开发、回测与部署算法交易策略。默认采用轻量级的 SQLite/Parquet 缓存，方便在本地快速迭代；当需要更高性能或横向扩展时，可以通过 `config.yml` 切换到 TimescaleDB。框架内置风险管理、绩效分析和 Alpaca 纸上交易 API 接入等组件，目标是让“课堂作业级”的原型具备真实可运行、可维护的工程化能力。
 
-## 关键特性
+## 为何说它已经具备工程化素质？
 
-- **工程化架构**：通过多阶段 `Dockerfile` 与 `docker-compose.yml` 进行容器化管理，确保运行环境可复现、易扩展。
-- **自动化工作流**：内置 GitHub Actions，可按日/周定时执行数据更新与回测任务。
-- **可安装的 CLI 工具集**：项目以 Python 包形式发布，提供数据更新、回测、实盘运行和报表生成等命令行入口。
-- **灵活的数据持久化方案**：默认使用 SQLite 或 Parquet 缓存，也可以在需要时切换到 TimescaleDB。
-- **多策略支持**：
-  - *均值回归（Z-Score）*：可选卡尔曼滤波，用于价格平滑处理。
-  - *趋势跟随（EMA 交叉）*：可选 ADX 过滤器以确认趋势强度。
-  - *动量策略（Price/MA Ratio）*：基于价格与长期均线比值的信号。
-- **风险管理模块**：下单前进行流动性、头寸敞口等检查，降低异常交易风险。
-- **绩效分析与可视化**：
-  - 基于 `backtrader` 的回测引擎。
-  - `PerformanceAnalyzer` 输出收益、换手率、交易成本及夏普/索提诺等指标。
-  - `Streamlit` 仪表盘展示实时表现与风险指标。
-- **稳健的实盘执行引擎**：基于 `asyncio`，具备 WebSocket 断线重连与状态校验机制。
+### 可复现的运行面
+- **多阶段 Docker 构建**：`Dockerfile` 使用 builder/runner 双阶段，先在完整镜像中构建 wheel，再在瘦身镜像中安装产物，默认启动命令即为 `run-live`，从构建到运行全流程封装。 
+- **Compose Profiles 分层**：`docker-compose.yml` 将 TimescaleDB 与交易服务分别挂在 `db`、`live` profile 下，既可单独调试数据库，也能一次拉起完整实盘栈；健康检查和依赖顺序都已声明。 
+- **输出挂载与 .dockerignore**：容器默认把 `./output` 映射到 `/app/output`，配合 `.dockerignore` 隔离本地缓存与敏感文件，便于落地部署。
+
+### 可安装的 CLI 与脚本分发
+- `pyproject.toml` 声明 `patf` 顶层命令与 `run-backtest`、`run-live` 等 5 个脚本入口，安装后可以直接在任何环境调用。 
+- `src/patf_trading_framework/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
+
+### 数据持久化与配置解耦
+- `config.yml` 中的 `database.backend` 支持 `sqlite`、`parquet` 与 `postgresql`，配合 `DBHandler` 可在无需改动代码的情况下切换存储。 
+- `.env.example`、`.envrc.example` 提供标准化的密钥注入与虚拟环境自动化脚本，支持 `uv`、`pip` 双方案回退。
+
+### 已覆盖的运行场景
+| 场景 | 推荐方式 | 说明 |
+| --- | --- | --- |
+| 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .[dev]` 后即可使用 CLI，启动速度最快。 |
+| 需要 TimescaleDB、长期运行或团队协作 | Docker（`--profile live`） | 容器一次性拉起交易服务与 TimescaleDB，环境完全可复现。 |
+| 只想调试数据库或接入 BI 工具 | Docker（`--profile db`） | 单独启动 TimescaleDB，供本地脚本或 BI 工具连接。 |
 
 ## 架构总览
 
@@ -54,7 +59,7 @@ flowchart LR
         Data_Utils -- "提供数据" --> BacktestScript
     end
 
-    subgraph Automation["自动化 (GitHub Actions)"]
+    subgraph Automation["自动化 (可选工作流)"]
         direction TB
         Cron_Data[每日数据更新]
         Cron_Backtest[每周回测]
@@ -78,15 +83,7 @@ flowchart LR
 
 ## 快速开始
 
-你可以选择使用 Docker（可选，用于可复现/部署）或本地 Python 环境来运行项目。
-
-| 场景 | 推荐方式 | 说明 |
-| --- | --- | --- |
-| 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .` 后即可使用 CLI，启动速度最快。
-| 需要 TimescaleDB、CI 任务或课堂验收 | Docker（`--profile live`） | 容器一次性拉起交易服务与 TimescaleDB，环境完全可复现。
-| 只想调试数据库 | Docker（`--profile db`） | 单独启动 TimescaleDB，供本地脚本或 BI 工具连接。
-
-下面分别介绍两种方式的具体步骤，同时提供 `Makefile` 快捷命令供选择。
+你可以选择使用 Docker（可选，用于可复现/部署）或本地 Python 环境来运行项目。下面分别介绍两种方式的具体步骤，同时提供 `Makefile` 快捷命令。
 
 ### 方式一：Docker（按需，可复现/部署用）
 
@@ -95,26 +92,17 @@ flowchart LR
    git clone https://github.com/runchengxie/algorithmic-trading-framework.git
    cd algorithmic-trading-framework
    ```
-
 2. **创建环境变量文件**
    ```bash
-   cp .env.example .env  # 如果仓库提供了示例文件，可直接复制
+   cp .env.example .env
    ```
-   若没有示例文件，可使用任意文本编辑器手动创建 `.env`，并填入以下内容：
-   ```env
-   APCA_API_KEY_ID="你的 Alpaca Paper Trading Key"
-   APCA_API_SECRET_KEY="你的 Alpaca Secret"
-   ALPACA_BASE_URL="https://paper-api.alpaca.markets"
-   POSTGRES_PASSWORD="用于 TimescaleDB 的密码"
-   ```
-
+   如果需要 TimescaleDB，请额外在 `.env` 中定义 `POSTGRES_PASSWORD`，并确保密钥不会提交到版本库。
 3. **启动服务**
    ```bash
    # 等价命令：make docker-live
    docker compose --profile live up trading-bot
    ```
-   `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。
-   使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
+   `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
 
 ### 方式二：本地 Python 环境
 
@@ -124,18 +112,16 @@ flowchart LR
    uv venv
    source .venv/bin/activate
 
-   # 或者使用标准库 venv
-   # python -m venv venv
-   # source venv/bin/activate
+   # 或使用标准库 venv
+   # python -m venv .venv
+   # source .venv/bin/activate
    ```
-
 2. **安装依赖并注册 CLI 命令**
    ```bash
    uv sync
-   uv pip install -e .
+   uv pip install -e .[dev]
    ```
-   执行以上命令后会自动在虚拟环境中注册 `patf` 命令行入口，方便通过统一的 CLI 调用各个脚本。
-
+   `.[dev]` 会额外拉取测试、lint 与 Jupyter 依赖，便于本地调试。如果只想安装最小集，可改为 `uv pip install -e .`。
 3. **配置凭证**
    将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
    ```bash
@@ -143,17 +129,14 @@ flowchart LR
    export APCA_API_SECRET_KEY="你的 Secret"
    export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
    ```
-
 4. **运行命令行工具**
    - 更新行情数据：`patf run-update-data`
    - 回测策略：`patf run-backtest`
    - 生成报表：`patf run-generate-report`
    - 启动纸上交易：`patf run-live`
+   - 启动仪表盘：`patf run-dashboard`
 
-## 常用命令速查
-
-项目根目录提供 `Makefile`，在安装完 CLI 后可以直接运行：
-
+### 常用 Make 命令
 ```bash
 make help           # 查看所有常用命令
 make backtest       # 本地回测
@@ -161,6 +144,73 @@ make update         # 更新数据缓存
 make docker-live    # 容器模式启动交易服务 + DB
 make docker-db      # 仅启动 TimescaleDB（容器）
 ```
+
+## CLI 命令手册
+
+| 命令 | 目标 | 关键操作 | 主要产出 |
+| --- | --- | --- | --- |
+| `run-update-data` | 获取最新行情并写入缓存/数据库 | 读取 `.env` 中的 Alpaca 密钥，调用 `fetch_historical_data` 并通过 `DBHandler` 写入 TimescaleDB/SQLite | `output/cache/` 下的 Parquet/SQLite 刷新；数据库 K 线数据 |
+| `run-backtest` | 运行单次回测或参数优化 | 初始化日志目录、载入策略、可选并行优化，生成图表/日志并可写入数据库 | `output/logs/trading_log_*.log`、`output/charts/*.png`、控制台指标汇总 |
+| `run-generate-report` | 汇总交易日志与绩效快照生成日报 | 从数据库提取 24 小时交易与绩效数据，调用 `PerformanceAnalyzer` 输出报告 | `output/daily_report_YYYYMMDD.json` |
+| `run-live` | 启动纸上交易执行引擎 | 初始化 `EnhancedTradingSystem`、订阅 Alpaca WebSocket、前置风险检查、异步处理订单 | `output/logs/` 中的实时日志、数据库中的交易/绩效快照 |
+| `run-dashboard` | 启动 Streamlit 仪表盘 | 调用 `streamlit run dashboard_app.py` 并监听本地端口 | Web UI（默认 http://localhost:8501） |
+
+### 命令详解
+- **run-update-data**：脚本会先加载 `.env`，然后根据 `config.yml` 中的 `data.ticker` 与时间范围决定拉取的标的与窗口，支持向缓存目录写入 Parquet 文件并通过 `DBHandler.initialize_db()` 创建所需表结构。
+- **run-backtest**：除策略回测外，还会根据 `config.yml.paths` 自动创建日志、图表、缓存目录，并把运行日志写入 `output/logs/trading_log_*.log`；在开启优化时尊重 `max_cpus` 设定。
+- **run-generate-report**：默认取最近 24 小时的交易与绩效快照，借助 `PerformanceAnalyzer.generate_performance_report()` 生成 JSON 文档，便于上游任务继续处理或推送。
+- **run-live**：`EnhancedTradingSystem` 内部组合了 `RiskManager`、`PerformanceAnalyzer`、`ConsistencyValidator` 与 `BrokerAPIHandler`，所有订单在入队前都会通过风险检查；同时支持 `no_fill_test_mode` 进行“不会成交”的联调演练。
+- **run-dashboard**：如果仓库安装了 `dashboard` 可选依赖，会启动 Streamlit 应用，实时展示数据库中的账户表现与风险指标。
+
+## 配置、环境与密钥管理
+
+- `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `NO_DEV=1` 禁用开发依赖。
+- `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。
+- Docker 场景：`docker-compose.yml` 会把主机的环境变量透传给交易容器，并通过卷挂载持久化输出目录；TimescaleDB 密码同样从 `.env` 自动注入。
+- 安全提醒：永远不要把密钥写入版本库，可将 `.env`、`.envrc` 保持在本地，同时利用 `.dockerignore` 避免构建镜像时打包敏感文件。
+
+## 风控参数与执行流程
+
+`config.yml` 的 `live_trading.risk_limits` 定义了下单前的硬约束，`RiskManager` 会在行情更新与订单评估时逐项验证：
+
+| 参数 | 含义 | 默认值 |
+| --- | --- | --- |
+| `max_order_participation_ratio` | 单笔委托不得超过近期成交量的比例，防止过度冲击市场 | 0.02 |
+| `max_bid_ask_spread_pct` | 可接受的最大点差百分比，避免在流动性极低时入场 | 0.005 |
+| `market_impact_coefficient` | 冲击成本模型系数，用于估计成交滑点 | 0.5 |
+| `max_gross_exposure` | 多空绝对敞口占净值的上限 | 1.5 |
+| `max_leverage` | 总资产 / 净资产的最大杠杆倍数 | 2.0 |
+| `max_var` / `max_concentration` / `min_liquidity` | VaR、单标的集中度与最小流动性门槛 | 0.05 / 0.3 / 1,000,000 |
+
+风控流程简述：行情经 `RiskManager.update_market_data()` 累积历史窗口 → `_perform_risk_checks` 检测价格跳变、量能突增、流动性不足 → 下单前调用 `check_liquidity_and_impact()`、`check_leverage_and_exposure()` 等函数，若超限则返回告警并阻止订单入队。
+
+## 实盘运行与组件职责
+
+`run_live_trading.py` 中的 `EnhancedTradingSystem` 以异步队列为中心组织事件流：
+- **数据通路**：`BrokerAPIHandler` 订阅行情与订单状态，通过 `asyncio.Queue` 推给策略与风控组件；断线自动重连，并在更新时记录详细日志。
+- **风险管理**：`RiskManager` 在订单生成前执行流动性、敞口、VaR 等校验；`ConsistencyValidator` 负责检查状态一致性与异常回调。
+- **绩效追踪**：`PerformanceAnalyzer` 按分钟写入投资组合快照，可配合 `DBHandler.log_performance_snapshot()` 存档，供日报与仪表盘读取。
+- **联调模式**：`no_fill_test_mode` 允许注入永不成交的测试单（通过价格偏移和自动撤单），用于验证消息流与风控逻辑。
+
+## 自动化调度（可选模板）
+
+仓库未直接附带 GitHub Actions Workflow 文件，但 CLI 已适配批处理场景。你可以基于下表快速创建调度脚本或 Actions 工作流：
+
+| 任务 | 推荐频率 | 命令 | 备注 |
+| --- | --- | --- | --- |
+| 行情更新 | 每日开盘前 | `patf run-update-data` | 需要 Alpaca API 密钥与数据库连接 |
+| 回测回归 | 每周或策略改动时 | `patf run-backtest --args ...` | 可结合参数优化输出对比图表 |
+| 日报生成 | 每日收盘后 | `patf run-generate-report` | 产出 JSON，可再由 CI 推送到 S3/钉钉等 |
+
+若在 GitHub Actions 部署，请记得在仓库 Secrets 中配置 Alpaca 凭证与数据库密码。
+
+## Roadmap / 已知局限
+
+- **成交模型待加强**：当前冲击成本为静态系数，后续计划引入基于订单簿深度的动态模型。 
+- **执行算法有限**：实盘仅提供均值回归策略，后续会补充 VWAP/TWAP 等算法。 
+- **回测逼真度**：尚未覆盖交易所费用、断路器、撮合延迟等细节，需要进一步模拟。 
+- **策略扩展**：虽有策略注册表，但缺少模板与文档指导多标的、多频率策略的接入。 
+- **回放测试**：目前无历史行情回放的集成测试场景，建议未来补充。
 
 ## 项目结构
 
@@ -174,26 +224,17 @@ make docker-db      # 仅启动 TimescaleDB（容器）
 ├── Makefile                      # 本地与 Docker 工作流统一入口
 ├── config.yml                    # 全局配置（策略参数、数据源、数据库）
 ├── docker-compose.yml            # Docker 编排配置
+├── Dockerfile                    # 多阶段构建产物镜像
 └── pyproject.toml                # 项目依赖与打包信息
 ```
 
 ## 常见问题（FAQ）
 
-### 1. 一定要用 TimescaleDB 吗？
-不需要。项目默认使用 SQLite/Parquet 缓存来降低门槛，等需要更长历史或多标的并发查询时，再切换到 TimescaleDB 即可。
-
-### 2. Alpaca 账号必须是真实资金吗？
-不需要。建议先使用 Alpaca Paper Trading（模拟账户）来测试策略。
-
-### 3. Docker 是必须的吗？
-不是。Docker 提供的是更稳的运行环境，但你完全可以在本地虚拟环境中直接运行脚本。
-
-### 4. 如何扩展新策略？
-在 `src/patf_trading_framework/strategies/` 下新增策略类，并在 `config.yml` 中配置相应参数，便可在 CLI 中切换使用。
-
-### 5. 如何切换数据存储后端？
-通过 `config.yml` 的 `database` 配置块即可。你可以选择：
-- `sqlite:///output/trading.db`
-- `parquet://output/cache`
-- `postgresql+psycopg2://user:pass@host:5432/dbname`
-
+1. **一定要用 TimescaleDB 吗？** 不需要。默认使用 SQLite/Parquet 缓存，等需要更长历史或多标的并发查询时，再切换到 TimescaleDB 即可。
+2. **Alpaca 账号必须是真实资金吗？** 不需要。推荐使用 Alpaca Paper Trading（模拟账户）完成联调。
+3. **Docker 是必须的吗？** 不是。Docker 仅提供可复现环境，本地虚拟环境照样可以直接运行脚本。
+4. **如何扩展新策略？** 在 `src/patf_trading_framework/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
+5. **如何切换数据存储后端？** 编辑 `config.yml` 的 `database` 配置块即可，例如：
+   - `sqlite:///output/trading.db`
+   - `parquet://output/cache`
+   - `postgresql+psycopg2://user:pass@host:5432/dbname`
