@@ -105,78 +105,79 @@ flowchart LR
 
 1. 克隆仓库
 
-   ```bash
-   git clone https://github.com/runchengxie/intraday-trader-air.git
-   cd intraday-trader-air
-   ```
+    ```bash
+    git clone https://github.com/runchengxie/intraday-trader-air.git
+    cd intraday-trader-air
+    ```
 
 2. 创建环境变量文件
 
-   ```bash
-   cp .env.example .env
-   ```
+    ```bash
+    cp .env.example .env
+    ```
 
-   如果需要 TimescaleDB，请额外在 `.env` 中定义 `POSTGRES_PASSWORD`，并确保密钥不会提交到版本库。
+    如果需要 TimescaleDB，请额外在 `.env` 中定义 `POSTGRES_PASSWORD`，并确保密钥不会提交到版本库。
+
 3. 启动服务
 
-   ```bash
-   # 等价命令：make docker-live
-   docker compose --profile live up trading-bot
-   ```
+    ```bash
+    # 等价命令：make docker-live
+    docker compose --profile live up trading-bot
+    ```
 
-   `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
-   Docker Compose 会自动将数据库连接字段（`DB_BACKEND=postgresql` 以及 `DB_HOST/PORT/USER/PASSWORD/NAME`）注入交易容器，对应的 `config.yml` 会读取这些环境变量完成 TimescaleDB 对接。
+    `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
+    Docker Compose 会自动将数据库连接字段（`DB_BACKEND=postgresql` 以及 `DB_HOST/PORT/USER/PASSWORD/NAME`）注入交易容器，对应的 `config.yml` 会读取这些环境变量完成 TimescaleDB 对接。
 
 ### 方式二：本地 Python 环境
 
 1. 创建虚拟环境
 
-   ```bash
-   # 推荐使用 uv
-   uv venv
-   source .venv/bin/activate
+    ```bash
+    # 推荐使用 uv
+    uv venv
+    source .venv/bin/activate
 
-   # 或使用标准库 venv
-   # python -m venv .venv
-   # source .venv/bin/activate
-   ```
+    # 或使用标准库 venv
+    # python -m venv .venv
+    # source .venv/bin/activate
+    ```
 
 2. 安装依赖并注册 CLI 命令
 
-   ```bash
-   uv sync
-   uv pip install -e .
-   ```
+    ```bash
+    uv sync
+    uv pip install -e .
+    ```
 
-   `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。默认情况下 `uv` 会忽略当前 shell 已激活的其他虚拟环境并使用项目根目录下的 `.venv`；若确实希望复用已激活环境，可在命令后加上 `--active`。
+    `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。默认情况下 `uv` 会忽略当前 shell 已激活的其他虚拟环境并使用项目根目录下的 `.venv`；若确实希望复用已激活环境，可在命令后加上 `--active`。
 
 3. 配置凭证
 
-   将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
+    将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
 
-   ```bash
-   export APCA_API_KEY_ID="你的 Key"
-   export APCA_API_SECRET_KEY="你的 Secret"
-   export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
-   ```
+    ```bash
+    export APCA_API_KEY_ID="你的 Key"
+    export APCA_API_SECRET_KEY="你的 Secret"
+    export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
+    ```
 
 4. 运行命令行工具
 
-  * 更新行情数据：`intraday update-data`
+    * 更新行情数据：`intraday update-data`
 
-  * 回补缺失行情字段：`intraday data backfill --fields trade_count,vwap`
+    * 回补缺失行情字段：`intraday data backfill --fields trade_count,vwap`
 
-  * 回测策略：`intraday backtest run`
+    * 回测策略：`intraday backtest run`
 
-  * 参数优化：`intraday backtest optimise`
+    * 参数优化：`intraday backtest optimise`
 
-  * 基准对比：`intraday backtest benchmark`
+    * 基准对比：`intraday backtest benchmark`
 
-  * 生成报表：`intraday generate-report`
+    * 生成报表：`intraday generate-report`
 
-  * 启动纸上交易：`intraday live`
+    * 启动纸上交易：`intraday live`
 
-  * 启动仪表盘：`intraday dashboard`
+    * 启动仪表盘：`intraday dashboard`
 
    #### 回测/优化常用参数
 
@@ -199,25 +200,25 @@ flowchart LR
     intraday backtest run --strategy ema_crossover --strategy mean_reversion
     ```
 
-  * 若只想生成买入持有序列，可使用 `intraday backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
+* 若只想生成买入持有序列，可使用 `intraday backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
 
     ```bash
      intraday backtest run --no-benchmark
     ```
 
-  * 若希望回测阶段严格要求 `trade_count` 与 `vwap` 均来自数据库缓存，可在 `config.yml` 的 `data.require_full_fields` 字段设置为 `true`。若验证失败，CLI 会提示先执行 `intraday data backfill` 以补齐历史缺失列。
+* 若希望回测阶段严格要求 `trade_count` 与 `vwap` 均来自数据库缓存，可在 `config.yml` 的 `data.require_full_fields` 字段设置为 `true`。若验证失败，CLI 会提示先执行 `intraday data backfill` 以补齐历史缺失列。
 
-   * `intraday backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
+* `intraday backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
 
-   * 回测、优化和数据更新命令会将日志写入 `output/logs`，图表输出至 `output/charts`（可在 `config.yml` 的 `paths` 段自定义）。
+* 回测、优化和数据更新命令会将日志写入 `output/logs`，图表输出至 `output/charts`（可在 `config.yml` 的 `paths` 段自定义）。
 
-   若需仪表盘，安装时请带上 `dashboard` 可选依赖：
+    若需仪表盘，安装时请带上 `dashboard` 可选依赖：
 
-   ```bash
-   uv pip install -e '.[dashboard]'
-   # 或
-   pip install -e '.[dashboard]'
-   ```
+    ```bash
+    uv pip install -e '.[dashboard]'
+    # 或
+    pip install -e '.[dashboard]'
+    ```
 
 ### 常用 Make 命令
 
@@ -353,8 +354,8 @@ make docker-db           # 仅启动 TimescaleDB（容器）
 
 5. 如何切换数据存储后端？ 编辑 `config.yml` 的 `database` 配置块即可。示例：
 
-   * 使用 SQLite：保持默认 `backend: sqlite` 与 `path: output/trading.db`
+    * 使用 SQLite：保持默认 `backend: sqlite` 与 `path: output/trading.db`
 
-   * 使用 Parquet：设置 `backend: parquet` 并调整 `path`
+    * 使用 Parquet：设置 `backend: parquet` 并调整 `path`
 
-   * 使用 TimescaleDB/PostgreSQL：设置 `backend: postgresql`，并通过环境变量或直接在配置中补充 `host/port/user/password/dbname`
+    * 使用 TimescaleDB/PostgreSQL：设置 `backend: postgresql`，并通过环境变量或直接在配置中补充 `host/port/user/password/dbname`
