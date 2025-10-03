@@ -166,7 +166,6 @@ flowchart LR
     * 更新行情数据：`intraday update-data`
 
     * 回补缺失行情字段：`intraday data backfill --fields trade_count,vwap`
-        * 长时间运行的回补任务默认会在交互终端展示进度条；若需要强制展示或关闭，可追加 `--progress rich` / `--progress none`。
 
     * 回测策略：`intraday backtest run`
 
