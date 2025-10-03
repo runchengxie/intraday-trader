@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ from intraday_trader_air.configuration import (
 from intraday_trader_air.data_utils import ensure_price_columns, fetch_api_bars
 from intraday_trader_air.db_handler import DBHandler
 from intraday_trader_air.logging_utils import ensure_directory, setup_logging
+from intraday_trader_air.progress_utils import ProgressManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,10 +99,18 @@ Window = tuple[pd.Timestamp, pd.Timestamp]
 
 
 class BackfillRunner:
-    def __init__(self, api: REST, db_handler: DBHandler, options: BackfillOptions):
+    def __init__(
+        self,
+        api: REST,
+        db_handler: DBHandler,
+        options: BackfillOptions,
+        *,
+        progress: ProgressManager | None = None,
+    ) -> None:
         self._api = api
         self._db_handler = db_handler
         self._options = options
+        self._progress = progress
 
     def run(self, symbol: str, start: str, end: str) -> None:
         start_ts = pd.Timestamp(start)
@@ -114,12 +124,40 @@ class BackfillRunner:
             self._options.chunk,
         )
 
+        total_windows = self._estimate_window_count(start_ts, end_ts)
+        chunk_task = None
+        success_count = 0
+        failure_count = 0
+        if self._progress and self._progress.is_active and total_windows:
+            chunk_task = self._progress.add_task(
+                f"[{symbol}] backfill windows", total=total_windows
+            )
+
         for window in _chunk_range(start_ts, end_ts, self._options.chunk):
-            self._backfill_window(symbol, window)
+            succeeded = self._backfill_window(symbol, window)
+            if succeeded:
+                success_count += 1
+            else:
+                failure_count += 1
+            if self._progress:
+                self._progress.advance(
+                    chunk_task,
+                    1,
+                    ok=success_count,
+                    fail=failure_count,
+                )
+
+    def _estimate_window_count(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> int:
+        delta = end - start
+        if delta <= pd.Timedelta(0):
+            return 0
+        return int(math.ceil(delta / self._options.chunk))
 
     def _backfill_window(
         self, symbol: str, window: Window
-    ) -> None:
+    ) -> bool:
         start_ts, end_ts = window
         start_str = start_ts.strftime("%Y-%m-%d")
         end_str = (end_ts - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -167,7 +205,7 @@ class BackfillRunner:
                 start_str,
                 end_str,
             )
-            return
+            return True
 
         _LOGGER.error(
             "Failed to backfill %s between %s and %s after %s attempts",
@@ -176,6 +214,7 @@ class BackfillRunner:
             end_str,
             self._options.max_retries,
         )
+        return False
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -220,6 +259,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=3,
         help="Number of retries per chunk when the API returns no data",
     )
+    parser.add_argument(
+        "--progress",
+        choices=["auto", "rich", "none"],
+        default="auto",
+        help=(
+            "Progress display mode: auto enables TTY-aware output, rich forces "
+            "progress bars, and none disables them entirely."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -262,10 +310,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         required_fields=required_fields,
         max_retries=args.max_retries,
     )
-    runner = BackfillRunner(api, db_handler, options)
+    progress = ProgressManager(mode=args.progress)
+    runner = BackfillRunner(api, db_handler, options, progress=progress)
 
-    for symbol in symbols:
-        runner.run(symbol, start, end)
+    with progress.live():
+        symbol_task = progress.add_task(
+            f"Backfill {len(symbols)} symbol(s)", total=len(symbols)
+        )
+        for symbol in symbols:
+            runner.run(symbol, start, end)
+            progress.advance(symbol_task, 1)
 
     _LOGGER.info("Backfill complete for %s", ", ".join(symbols))
     return 0
