@@ -105,3 +105,4 @@
 104|def test_main_short_help_flag_returns_zero():
 105|    assert main(["-h"]) == 0
 106|
+

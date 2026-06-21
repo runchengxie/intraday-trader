@@ -82,3 +82,4 @@
 81|    with pytest.raises(ConfigurationError):
 82|        load_app_config(config_path)
 83|
+

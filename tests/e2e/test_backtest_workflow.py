@@ -55,3 +55,4 @@
 54|    # In this specific scenario (sell high, cover at the mean), a profit is expected
 55|    assert analysis_results["Final Value"] > 100000
 56|
+

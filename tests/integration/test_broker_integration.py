@@ -247,3 +247,4 @@
 246|    assert not received_updates.empty() or "first_message" in locals()
 247|    logger.info("WebSocket stream test successful.")
 248|
+

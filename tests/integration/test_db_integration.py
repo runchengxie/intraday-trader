@@ -247,3 +247,4 @@
 246|    assert snapshots_df["portfolio_value"].iloc[0] == pytest.approx(105000.75)
 247|    logger.info("Performance snapshot log and retrieval verified.")
 248|
+

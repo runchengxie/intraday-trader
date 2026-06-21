@@ -39,3 +39,4 @@
 38|    system.trading_strategy.get_signal.assert_called_once_with(150.0, 0.0)
 39|    system._execute_trade.assert_called_once_with("BUY", 150.0)
 40|
+

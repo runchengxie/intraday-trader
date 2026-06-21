@@ -69,3 +69,4 @@
 68|    assert build_expected_frequency(1, "DAY") == "1D"
 69|    assert build_expected_frequency(1, "weird") is None
 70|
+

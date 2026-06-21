@@ -95,3 +95,4 @@
 94|    stored_sorted = stored.sort_values("timestamp").reset_index(drop=True)
 95|    assert pytest.approx(stored_sorted.loc[0, "close"]) == 555.5
 96|
+

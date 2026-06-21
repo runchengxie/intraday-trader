@@ -110,3 +110,4 @@
 109|    await asyncio.wait_for(stream_task, timeout=1)
 110|    assert handler.stream is None
 111|
+

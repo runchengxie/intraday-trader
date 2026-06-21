@@ -248,3 +248,4 @@
 247|    assert len(data) == 1
 248|    assert data[0]["error_type"] == "TypeError"
 249|
+
