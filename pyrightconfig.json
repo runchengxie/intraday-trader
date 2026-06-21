@@ -9,5 +9,13 @@
   "reportGeneralTypeIssues": "warning",
   "reportArgumentType": "warning",
   "reportAttributeAccessIssue": "warning",
-  "reportCallIssue": "warning"
+  "reportCallIssue": "warning",
+  "executionEnvironments": [
+    {
+      "root": "src/intraday_trader_air/scripts",
+      "reportUnknownMemberType": "none",
+      "reportAttributeAccessIssue": "none",
+      "reportMissingTypeStubs": "none"
+    }
+  ]
 }

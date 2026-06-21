@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import typing
 
 import backtrader as bt
 import pytz
@@ -122,7 +123,7 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
             try:
                 import pandas as pd  # Local import to avoid hard dependency at module load
 
-                column = raw_source["filtered_close"]
+                column = typing.cast(pd.DataFrame, raw_source)["filtered_close"]
                 if not isinstance(column, pd.Series):
                     column = pd.Series(column)
                 self._filtered_price_series = column.reset_index(drop=True)

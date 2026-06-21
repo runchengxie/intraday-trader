@@ -45,7 +45,13 @@ def main():
     API_KEY = os.getenv("APCA_API_KEY_ID")
     SECRET_KEY = os.getenv("APCA_API_SECRET_KEY")
     BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
-    api = REST(API_KEY, SECRET_KEY, base_url=BASE_URL)
+
+    if not API_KEY or not SECRET_KEY:
+        raise RuntimeError(
+            "APCA_API_KEY_ID and APCA_API_SECRET_KEY must be set in .env"
+        )
+
+    api = REST(API_KEY, SECRET_KEY, base_url=BASE_URL)  # type: ignore[arg-type]
 
     # --- Core Logic ---
     # Usually fetch data for yesterday
@@ -58,7 +64,7 @@ def main():
     bars = fetch_historical_data(
         api=api,
         symbol=symbol,
-        timeframe=TimeFrame.Minute,  # Fetch minute data
+        timeframe=TimeFrame.Minute,  # type: ignore  # Fetch minute data
         start_date=yesterday,
         end_date=yesterday,
         cache_dir=str(config.paths.cache_dir),

@@ -1,11 +1,14 @@
 """File-system Parquet storage for market data, trade logs, and performance snapshots."""
 
+# pyright: reportUnknownMemberType=false
+
 from __future__ import annotations
 
 import logging
+import typing
 from pathlib import Path
 
-import pandas as pd
+import pandas as pd  # type: ignore[reportMissingTypeStubs]
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,7 @@ class ParquetStore:
         path = self._table_path(name)
         if not path.exists():
             return pd.DataFrame()
-        return pd.read_parquet(path)
+        return pd.read_parquet(path)  # type: ignore[reportUnknownMemberType]
 
     def _write_table(self, name: str, df: pd.DataFrame) -> None:
         path = self._table_path(name)
@@ -71,7 +74,7 @@ class ParquetStore:
         if not path.exists():
             return pd.DataFrame()
         df = pd.read_parquet(path)
-        df = df[df["symbol"] == symbol]
+        df = typing.cast(pd.DataFrame, df[df["symbol"] == symbol])
         return df
 
     # -- trade logs ------------------------------------------------------

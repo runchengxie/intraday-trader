@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import sys
+import typing
 from collections.abc import Callable, Sequence
 
 _BACKTEST_COMMANDS = {
@@ -39,7 +40,7 @@ def _load_callable(path: str) -> Callable[[Sequence[str] | None], int | None]:
     func = getattr(module, func_name)
     if not callable(func):  # pragma: no cover - defensive path
         raise AttributeError(f"{path} is not callable")
-    return func
+    return typing.cast(Callable[[Sequence[str] | None], int | None], func)
 
 
 def _build_parser() -> argparse.ArgumentParser:

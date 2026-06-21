@@ -8,6 +8,7 @@ to the local SQLAlchemy session machinery.  ORM models are imported from
 from __future__ import annotations
 
 import logging
+import typing
 from pathlib import Path
 
 import pandas as pd
@@ -408,6 +409,7 @@ class DBHandler:
                 return []
             return [TradeLog(**row) for row in df.to_dict(orient="records")]
 
+        assert self.Session is not None  # SQL backend
         session = self.Session()
         try:
             query = (
@@ -462,6 +464,7 @@ class DBHandler:
             )
             return
 
+        assert self.Session is not None  # SQL backend
         session = self.Session()
         try:
             session.add(trade)
@@ -486,6 +489,7 @@ class DBHandler:
                 return []
             return [PerformanceSnapshot(**row) for row in df.to_dict(orient="records")]
 
+        assert self.Session is not None  # SQL backend
         session = self.Session()
         try:
             query = (
@@ -540,6 +544,7 @@ class DBHandler:
             )
             return
 
+        assert self.Session is not None  # SQL backend
         session = self.Session()
         try:
             session.add(snapshot)
@@ -594,9 +599,9 @@ class DBHandler:
             if end_ts is not None and end_ts.tzinfo is None:
                 end_ts = end_ts.tz_localize("America/New_York")
             if start_ts:
-                df = df[df.index >= start_ts]
+                df = typing.cast(pd.DataFrame, df[df.index >= start_ts])
             if end_ts:
-                df = df[df.index < end_ts]
+                df = typing.cast(pd.DataFrame, df[df.index < end_ts])
 
         if not df.empty:
             logger.info(

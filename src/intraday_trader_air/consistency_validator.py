@@ -104,7 +104,7 @@ class SignalConsistencyTest(ConsistencyTest):
             time_diffs = abs(live_period["timestamp"] - bt_signal["timestamp"])
             closest_idx = time_diffs.idxmin()
 
-            if time_diffs[closest_idx] <= timedelta(minutes=5):  # 5-minute tolerance
+            if pd.Timedelta(time_diffs[closest_idx]) <= timedelta(minutes=5):  # 5-minute tolerance
                 live_signal = live_period.loc[closest_idx]
 
                 # Compare signal values

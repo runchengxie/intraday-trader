@@ -292,4 +292,4 @@ def apply_kalman_filter(prices: pd.Series, span: int = 10) -> pd.Series:
 
     smoothed = prices.ewm(span=span, adjust=False).mean()
     smoothed.name = getattr(prices, "name", "smoothed")
-    return smoothed
+    return pd.Series(smoothed)

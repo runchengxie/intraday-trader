@@ -929,7 +929,7 @@ class EnhancedTradingSystem:
                         or self.performance_analyzer.initial_capital
                     )
                     gross_position_value = abs(
-                        self.trading_state.current_position_qty * current_price
+                        self.trading_state.current_position_qty * float(current_price)  # type: ignore[arg-type]
                     )
 
                     leverage_passed, leverage_warnings = (
@@ -984,15 +984,15 @@ class EnhancedTradingSystem:
         logger.info("[VERIFY] Performing one-shot account and position refresh.")
 
         # 1. Refresh account info (cash, portfolio value)
-        refreshed_account_info = self.broker_handler.get_account_info()
+        refreshed_account_info = self.broker_handler.get_account_info()  # type: ignore[union-attr]
         if refreshed_account_info:
             self.trading_state.update_cash_and_value(
-                float(refreshed_account_info.cash),
-                float(refreshed_account_info.portfolio_value),
+                float(refreshed_account_info.cash),  # type: ignore[arg-type]
+                float(refreshed_account_info.portfolio_value),  # type: ignore[arg-type]
             )
 
         # 2. Refresh position info and check for discrepancies
-        position = self.broker_handler.get_position(self.trading_state.symbol)
+        position = self.broker_handler.get_position(self.trading_state.symbol)  # type: ignore[union-attr]
         api_qty = float(getattr(position, "qty", 0.0)) if position else 0.0
 
         stream_qty = self.trading_state.current_position_qty

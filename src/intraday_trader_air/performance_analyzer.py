@@ -1,5 +1,6 @@
 import json
 import logging
+import typing
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -126,7 +127,7 @@ class PerformanceAnalyzer:
         df.set_index("timestamp", inplace=True)
         df.sort_index(inplace=True)
 
-        returns = df["value"].pct_change().dropna()
+        returns = typing.cast(pd.Series, df["value"].pct_change().dropna())
         return returns
 
     def attach_benchmark_series(

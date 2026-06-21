@@ -100,7 +100,7 @@ class CircuitBreaker:
         self,
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
-        expected_exception: type = Exception,
+        expected_exception: type[Exception] = Exception,
     ):
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -132,10 +132,9 @@ class CircuitBreaker:
 
     def _should_attempt_reset(self) -> bool:
         """Checks if it's time to attempt resetting the circuit breaker."""
-        return (
-            self.last_failure_time
-            and time.time() - self.last_failure_time >= self.recovery_timeout
-        )
+        if self.last_failure_time is None:
+            return False
+        return time.time() - self.last_failure_time >= self.recovery_timeout
 
     def _on_success(self):
         """Handles a successful call."""
