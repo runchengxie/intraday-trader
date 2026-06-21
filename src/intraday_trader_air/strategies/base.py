@@ -9,7 +9,9 @@ import typing
 
 import backtrader as bt  # type: ignore[reportMissingTypeStubs]
 import pytz
-from backtrader.utils.autodict import AutoOrderedDict  # type: ignore[reportMissingTypeStubs]
+from backtrader.utils.autodict import (
+    AutoOrderedDict,  # type: ignore[reportMissingTypeStubs]
+)
 from backtrader.utils.date import num2date  # type: ignore[reportMissingTypeStubs]
 
 STATUS_NAME = {

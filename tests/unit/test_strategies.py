@@ -1,9 +1,12 @@
 import pytest
+
 # pyright: reportUnknownMemberType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportOptionalMemberAccess=false, reportArgumentType=false, reportGeneralTypeIssues=false
 
 pd = pytest.importorskip("pandas")
 bt = pytest.importorskip("backtrader")
 
+from intraday_trader_air.backtest.engine import BacktestEngine
+from intraday_trader_air.scripts.run_backtests import extend_pandas_data
 from intraday_trader_air.strategies import (
     BaseStrategy,
     BuyAndHold,
@@ -16,8 +19,6 @@ from intraday_trader_air.strategies.utils import (
     compute_zscore,
     validate_series,
 )
-from intraday_trader_air.backtest.engine import BacktestEngine
-from intraday_trader_air.scripts.run_backtests import extend_pandas_data
 
 
 @pytest.fixture
@@ -214,6 +215,7 @@ class TestMeanReversion:
 # RatioStrategy tests
 # ---------------------------------------------------------------------------
 
+
 class TestRatioStrategy:
     def test_ratio_strategy_initializes(self, run_strategy):
         outcome = run_strategy(RatioStrategy)
@@ -247,7 +249,7 @@ class TestComputeZScore:
 
     def test_zscore_near_zero_for_flat_series(self):
         flat = pd.Series([10.0] * 100)
-        z, mean, std = compute_zscore(flat, period=20)
+        z, _mean, _std = compute_zscore(flat, period=20)
         # The last value should be near 0 since all values are equal
         assert abs(z.iloc[-1]) < 0.01
 
