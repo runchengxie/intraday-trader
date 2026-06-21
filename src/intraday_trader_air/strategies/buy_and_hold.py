@@ -1,5 +1,7 @@
 """Buy and hold benchmark strategy for baseline comparisons."""
 
+# pyright: reportUnknownMemberType=false, reportMissingTypeStubs=false
+
 import backtrader as bt
 
 

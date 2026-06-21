@@ -1,5 +1,7 @@
 """Small helper utilities shared by strategy implementations."""
 
+# pyright: reportUnknownMemberType=false, reportMissingTypeStubs=false
+
 import backtrader.indicators as btind
 
 

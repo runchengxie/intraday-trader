@@ -1,5 +1,7 @@
 """Momentum strategy comparing price to a long-term moving average."""
 
+# pyright: reportUnknownMemberType=false
+
 import pandas as pd
 
 from .base import BaseStrategy

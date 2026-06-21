@@ -1,5 +1,7 @@
 """Trend-following EMA crossover strategy with ADX confirmation."""
 
+# pyright: reportUnknownMemberType=false, reportMissingTypeStubs=false
+
 import backtrader.indicators as btind
 import pandas as pd
 
