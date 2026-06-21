@@ -1,0 +1,13 @@
+{
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "basic",
+  "include": ["src", "tests"],
+  "exclude": [".venv", ".git", "__pycache__", "dist", "build"],
+  "reportMissingTypeStubs": "warning",
+  "reportUnknownMemberType": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "reportArgumentType": "warning",
+  "reportAttributeAccessIssue": "warning",
+  "reportCallIssue": "warning"
+}

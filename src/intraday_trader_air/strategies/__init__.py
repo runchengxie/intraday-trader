@@ -18,11 +18,11 @@ REGISTRY = {
 }
 
 __all__ = [
+    "REGISTRY",
     "BaseStrategy",
-    "OrderLoggerMixin",
     "BuyAndHoldStrategy",
+    "CustomRatioStrategy",
     "EMACrossoverStrategy",
     "MeanReversionZScoreStrategy",
-    "CustomRatioStrategy",
-    "REGISTRY",
+    "OrderLoggerMixin",
 ]

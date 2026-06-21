@@ -64,16 +64,19 @@ dev = [
     "pytest-cov",
     "ruff",
     "pre-commit",
+    "pyright",
 ]
 
 # Define script entry points, allowing them to be run from the command line after installation.
+# NOTE: run-backtest, run-live, run-update-data, run-generate-report, run-dashboard
+# are DEPRECATED. Use the unified `intraday` CLI instead. They will be removed in a future release.
 [project.scripts]
 intraday = "intraday_trader_air.cli:main"
-run-backtest = "intraday_trader_air.scripts.run_backtests:main"
-run-live = "intraday_trader_air.scripts.run_live_trading:main"
-run-update-data = "intraday_trader_air.scripts.run_update_data:main"
-run-generate-report = "intraday_trader_air.scripts.run_generate_report:main"
-run-dashboard = "intraday_trader_air.scripts.run_dashboard:main"
+run-backtest = "intraday_trader_air.scripts.run_backtests:main"  # DEPRECATED
+run-live = "intraday_trader_air.scripts.run_live_trading:main"   # DEPRECATED
+run-update-data = "intraday_trader_air.scripts.run_update_data:main"  # DEPRECATED
+run-generate-report = "intraday_trader_air.scripts.run_generate_report:main"  # DEPRECATED
+run-dashboard = "intraday_trader_air.scripts.run_dashboard:main"  # DEPRECATED
 
 [project.urls]
 Homepage = "N/A"
@@ -107,11 +110,20 @@ docstring-code-format = true
 # I: isort (import sorting)
 # UP: pyupgrade (modernize code syntax)
 # PL: Pylint (many transplanted Pylint rules)
-select = ["E", "W", "F", "I", "UP", "PL"]
+# B: flake8-bugbear (common bug patterns)
+# C4: flake8-comprehensions (simplify comprehensions)
+# SIM: flake8-simplify (code simplification)
+# RET: flake8-return (return statement checks)
+# ARG: flake8-unused-arguments (unused arguments)
+# DTZ: flake8-datetimez (timezone-aware datetime)
+# RUF: Ruff-specific rules
+select = ["E", "W", "F", "I", "UP", "PL", "B", "C4", "SIM", "RET", "ARG", "DTZ", "RUF"]
 
-# Ignore specific rules that were previously disabled in Pylint.
+# Ignore specific rules.
 ignore = [
     "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", # pydocstyle missing docstrings
+    "PLR0913",  # Too many arguments — deferred for P2 refactoring
+    "PLR0912",  # Too many branches — deferred for P2 refactoring
 ]
 
 # Specific configuration for the import sorter (isort).

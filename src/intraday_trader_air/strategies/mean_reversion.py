@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 import statistics
 from collections import deque
-from typing import Deque
 
 from .base import BaseStrategy
 
@@ -23,7 +22,7 @@ class MeanReversionZScoreStrategy(BaseStrategy):
 
     def __init__(self):
         super().__init__()
-        self._price_history: Deque[float] = deque(maxlen=self.p.zscore_period)
+        self._price_history: deque[float] = deque(maxlen=self.p.zscore_period)
         self._zscore: float = math.nan
         self._sma: float = math.nan
         self._stdev: float = math.nan

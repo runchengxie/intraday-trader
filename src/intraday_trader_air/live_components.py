@@ -106,12 +106,11 @@ class LiveMeanReversionStrategy:
         # Convert signal format to match expected output
         if signal == "BUY":
             return "buy"
-        elif signal == "SELL":
+        if signal == "SELL":
             return "sell"
-        elif signal == "CLOSE":
+        if signal == "CLOSE":
             return "sell" if current_position_qty > 0 else "buy"
-        else:
-            return "hold"
+        return "hold"
 
     def get_signal_confidence(self) -> float:
         """Return confidence level of the current signal based on Z-score magnitude."""
@@ -124,10 +123,9 @@ class LiveMeanReversionStrategy:
         # Higher confidence for stronger signals
         if abs_zscore >= max(abs(self.zscore_upper), abs(self.zscore_lower)):
             return min(0.95, 0.5 + abs_zscore * 0.1)  # Cap at 95%
-        elif abs_zscore >= abs(self.exit_threshold):
+        if abs_zscore >= abs(self.exit_threshold):
             return min(0.8, 0.3 + abs_zscore * 0.1)
-        else:
-            return max(0.1, abs_zscore * 0.2)  # Minimum 10% confidence
+        return max(0.1, abs_zscore * 0.2)  # Minimum 10% confidence
 
 
 class TradingState:

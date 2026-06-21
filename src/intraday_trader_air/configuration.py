@@ -5,9 +5,10 @@ from __future__ import annotations
 import multiprocessing
 import os
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 _ALLOWED_DB_BACKENDS = {"sqlite", "postgresql", "parquet"}
 _ALLOWED_TIMEFRAME_UNITS = {"minute", "hour", "day"}

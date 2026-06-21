@@ -606,9 +606,9 @@ class ConsistencyValidator:
         """Converts an object to a serializable format."""
         if isinstance(obj, dict):
             return {k: self._make_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
+        if isinstance(obj, list):
             return [self._make_serializable(item) for item in obj]
-        elif isinstance(obj, ValidationResult):
+        if isinstance(obj, ValidationResult):
             return {
                 "test_name": obj.test_name,
                 "passed": obj.passed,
@@ -617,14 +617,13 @@ class ConsistencyValidator:
                 "warnings": obj.warnings,
                 "recommendations": obj.recommendations,
             }
-        elif isinstance(obj, (datetime, pd.Timestamp)):
+        if isinstance(obj, (datetime, pd.Timestamp)):
             return obj.isoformat()
-        elif isinstance(obj, np.ndarray):
+        if isinstance(obj, np.ndarray):
             return obj.tolist()
-        elif isinstance(obj, (np.integer, np.floating)):
+        if isinstance(obj, (np.integer, np.floating)):
             return obj.item()
-        else:
-            return obj
+        return obj
 
     def get_validation_history(self, days: int = 30) -> list[dict]:
         """Gets the validation history."""

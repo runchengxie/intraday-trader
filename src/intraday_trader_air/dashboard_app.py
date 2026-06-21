@@ -57,11 +57,13 @@ else:
     # --- Calculate metrics using PerformanceAnalyzer ---
     initial_capital = config.backtest.initial_cash
     analyzer = PerformanceAnalyzer(initial_capital)
-    risk_manager = RiskManager()
+    risk_manager = RiskManager(risk_config={})
 
     # Populate analyzer with snapshot data
     analyzer.portfolio_values = list(
-        zip(perf_snapshots["timestamp"], perf_snapshots["portfolio_value"])
+        zip(
+            perf_snapshots["timestamp"], perf_snapshots["portfolio_value"], strict=False
+        )
     )
     returns = analyzer.calculate_returns()
     if not returns.empty:

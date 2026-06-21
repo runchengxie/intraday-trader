@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import backtrader as bt
 import pytz
-from backtrader.utils.date import num2date
 from backtrader.utils.autodict import AutoOrderedDict
+from backtrader.utils.date import num2date
 
 STATUS_NAME = {
     bt.Order.Created: "created",
@@ -105,7 +104,7 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
 
     def _init_price_source(self) -> None:
         data = self.datas[0]
-        self._filtered_price_series: Optional["pd.Series"] = None
+        self._filtered_price_series: pd.Series | None = None
 
         if self.p.use_filtered_price and hasattr(data, "filtered_close"):
             self.dataclose = data.filtered_close
@@ -189,7 +188,9 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
             price = self.compute_limit_price(direction, limit_offset_pct)
             kwargs["exectype"] = bt.Order.Limit
             kwargs["price"] = price
-        computed_size = size if size is not None else self._default_position_size(direction)
+        computed_size = (
+            size if size is not None else self._default_position_size(direction)
+        )
         if computed_size == 0:
             self.log(
                 "Skipping order because computed size is zero; check size_pct and available cash."
@@ -199,7 +200,7 @@ class BaseStrategy(OrderLoggerMixin, bt.Strategy):
 
         if direction > 0:
             return self.buy(**kwargs)
-        elif direction < 0:
+        if direction < 0:
             return self.sell(**kwargs)
         raise ValueError("Direction must be +1 or -1 when placing an order")
 

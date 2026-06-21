@@ -77,7 +77,9 @@ def test_missing_backtest_subcommand_raises():
 
 
 def test_unknown_backtest_subcommand_raises():
-    with pytest.raises(CommandNotFoundError, match="unknown backtest command 'flibble'"):
+    with pytest.raises(
+        CommandNotFoundError, match="unknown backtest command 'flibble'"
+    ):
         _resolve_command(["backtest", "flibble"])
 
 

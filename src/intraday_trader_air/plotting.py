@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Iterable, Optional
+from collections.abc import Iterable
 from datetime import datetime
+from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -14,14 +14,14 @@ import pandas as pd
 
 def plot_equity_vs_benchmark(
     portfolio_values: Iterable[tuple[datetime, float]],
-    benchmark_returns: Optional[pd.Series],
+    benchmark_returns: pd.Series | None,
     initial_capital: float,
     *,
     title: str = "Strategy vs Benchmark",
-    out_path: Optional[str | Path] = None,
-    exposure: Optional[pd.Series] = None,
-    buy_markers: Optional[pd.Series] = None,
-    sell_markers: Optional[pd.Series] = None,
+    out_path: str | Path | None = None,
+    exposure: pd.Series | None = None,
+    buy_markers: pd.Series | None = None,
+    sell_markers: pd.Series | None = None,
     show: bool = False,
 ) -> Path | None:
     """Plot equity curve, benchmark, drawdowns, and optional exposure."""
@@ -36,7 +36,7 @@ def plot_equity_vs_benchmark(
 
     equity_norm = df["equity"] / float(initial_capital)
 
-    bench_norm: Optional[pd.Series] = None
+    bench_norm: pd.Series | None = None
     if benchmark_returns is not None and len(benchmark_returns) > 0:
         bench_curve = (1 + pd.Series(benchmark_returns).dropna()).cumprod()
         bench_curve = bench_curve.reindex(df.index).ffill()
@@ -188,10 +188,12 @@ def plot_equity_vs_benchmark(
         f"MaxDD: {mdd * 100:.1f}%",
     ]
     if alpha is not None and info_ratio is not None:
-        stat_lines.extend([
-            f"Alpha: {alpha * 100:.1f}%",
-            f"IR: {info_ratio:.2f}",
-        ])
+        stat_lines.extend(
+            [
+                f"Alpha: {alpha * 100:.1f}%",
+                f"IR: {info_ratio:.2f}",
+            ]
+        )
 
     ax_top.text(
         0.99,
@@ -224,8 +226,8 @@ def plot_equity_vs_benchmark(
 def plot_from_analyzer(
     analyzer,
     *,
-    out_path: Optional[str | Path] = None,
-    title: Optional[str] = None,
+    out_path: str | Path | None = None,
+    title: str | None = None,
     show: bool = False,
 ):
     """Convenience wrapper to draw charts directly from a performance analyzer."""

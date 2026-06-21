@@ -78,9 +78,7 @@ class _DummyStream:
 async def test_streaming_uses_callbacks(monkeypatch, mock_broker_dependencies):
     """BrokerAPIHandler should forward streamed trades to the provided callback."""
 
-    monkeypatch.setattr(
-        "intraday_trader_air.broker_handler.Stream", _DummyStream
-    )
+    monkeypatch.setattr("intraday_trader_air.broker_handler.Stream", _DummyStream)
 
     handler = BrokerAPIHandler()
 

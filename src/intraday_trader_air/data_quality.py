@@ -14,7 +14,6 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -108,7 +107,7 @@ def _check_missing_bars(
         passed=len(missing) == 0,
         details={
             "expected_frequency": expected_frequency,
-            "missing_count": int(len(missing)),
+            "missing_count": len(missing),
             "sample_missing": sample_missing,
         },
         warnings=warnings,
@@ -247,12 +246,3 @@ def build_expected_frequency(timeframe_value: int, timeframe_unit: str) -> str |
     if unit.startswith("day"):
         return f"{timeframe_value}D"
     return None
-
-
-def summarize_warnings(reports: Iterable[dict[str, object]]) -> list[str]:
-    """Flatten warning messages from multiple QC reports."""
-
-    messages: list[str] = []
-    for report in reports:
-        messages.extend(report.get("warnings", []))
-    return messages

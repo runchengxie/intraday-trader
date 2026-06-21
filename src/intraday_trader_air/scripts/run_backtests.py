@@ -6,11 +6,11 @@ import argparse
 import logging
 import multiprocessing
 import os
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
-from collections.abc import Iterable, Sequence
 
 import backtrader as bt
 import pandas as pd

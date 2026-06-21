@@ -117,9 +117,7 @@ class BackfillRunner:
         for window in _chunk_range(start_ts, end_ts, self._options.chunk):
             self._backfill_window(symbol, window)
 
-    def _backfill_window(
-        self, symbol: str, window: Window
-    ) -> None:
+    def _backfill_window(self, symbol: str, window: Window) -> None:
         start_ts, end_ts = window
         start_str = start_ts.strftime("%Y-%m-%d")
         end_str = (end_ts - timedelta(days=1)).strftime("%Y-%m-%d")

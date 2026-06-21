@@ -303,8 +303,7 @@ class ExceptionHandler:
                 if circuit_breaker_name in self.circuit_breakers:
                     circuit_breaker = self.circuit_breakers[circuit_breaker_name]
                     return circuit_breaker.call(func, *args, **kwargs)
-                else:
-                    return func(*args, **kwargs)
+                return func(*args, **kwargs)
 
             return wrapper
 
@@ -441,17 +440,15 @@ def handle_exceptions(
 
                 if retry:
                     return handler.retry_with_backoff(func, category, *args, **kwargs)
-                else:
-                    return handler.safe_execute(
-                        lambda: func(*args, **kwargs),
-                        category,
-                        severity,
-                        {"function": func.__name__},
-                        default_return,
-                    )
-            else:
-                # If no exception_handler is found, execute the function directly
-                return func(*args, **kwargs)
+                return handler.safe_execute(
+                    lambda: func(*args, **kwargs),
+                    category,
+                    severity,
+                    {"function": func.__name__},
+                    default_return,
+                )
+            # If no exception_handler is found, execute the function directly
+            return func(*args, **kwargs)
 
         return wrapper
 

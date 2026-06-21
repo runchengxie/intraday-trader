@@ -6,10 +6,10 @@ import pytest
 
 pd = pytest.importorskip("pandas")
 
+from dataclasses import asdict
+
 from dotenv import load_dotenv
 from sqlalchemy import inspect, text
-
-from dataclasses import asdict
 
 from intraday_trader_air.configuration import load_app_config
 from intraday_trader_air.db_handler import (

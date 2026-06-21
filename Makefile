@@ -1,4 +1,4 @@
-.PHONY: help sync backtest optimise benchmark update live dashboard lint fmt coverage docker-build docker-backtest docker-live docker-db
+.PHONY: help sync backtest optimise benchmark update live dashboard lint fmt coverage typecheck ci docker-build docker-backtest docker-live docker-db
 
 UV ?= uv
 UV_FLAGS ?=
@@ -25,7 +25,9 @@ help:
 	&& echo "  make dashboard      # Launch Streamlit dashboard" \
 	&& echo "  make lint           # Run Ruff lint checks" \
 	&& echo "  make fmt            # Run Ruff formatter" \
+	&& echo "  make typecheck      # Run Pyright type checker" \
 	&& echo "  make coverage       # Run pytest coverage" \
+	&& echo "  make ci             # Full CI: lint + fmt + typecheck + test" \
 	&& echo "Docker helpers (use --profile live/db as needed):" \
 	&& echo "  make docker-build   # Build trading image" \
 	&& echo "  make docker-backtest # Run backtest inside container" \
@@ -61,6 +63,11 @@ fmt:
 
 coverage:
 	$(call UV_RUN,pytest --cov=intraday_trader_air --cov-report=term-missing)
+
+typecheck:
+	$(call UV_RUN,pyright src tests)
+
+ci: lint fmt typecheck coverage
 
 docker-build:
 	docker compose build

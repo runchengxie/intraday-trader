@@ -320,9 +320,8 @@ class BrokerAPIHandler:
             if e.code == 404:
                 logger.debug(f"Querying position: No position held for {symbol}.")
                 return None  # Return None to indicate no position, not an error
-            else:
-                logger.error(f"Failed to query position for {symbol}: {e}")
-                return None  # Return None for actual errors too, caller needs to differentiate if necessary
+            logger.error(f"Failed to query position for {symbol}: {e}")
+            return None  # Return None for actual errors too, caller needs to differentiate if necessary
         except Exception as e:
             logger.error(
                 f"An unknown error occurred while querying position for {symbol}: {e}"

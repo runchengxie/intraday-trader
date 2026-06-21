@@ -2,7 +2,6 @@ import logging
 import os
 from datetime import date, datetime, timedelta
 
-import numpy as np
 import pandas as pd
 
 NY_TIMEZONE = "America/New_York"
@@ -16,16 +15,12 @@ logger = logging.getLogger(__name__)
 
 # --- Helper Function to find the nearest previous trading day ---
 def get_last_trading_day(api_instance, target_date_str):
-    """
-    Finds the trading day on or immediately preceding the target date.
+    """Deprecated: use Alpaca calendar API directly via the broker handler."""
+    logger.warning(
+        "get_last_trading_day is deprecated and will be removed in a future version."
+    )
+    from datetime import timedelta
 
-    Args:
-        api_instance (REST): Initialized Alpaca API client.
-        target_date_str (str): The target date in 'YYYY-MM-DD' format.
-
-    Returns:
-        str: The date string of the actual trading day in 'YYYY-MM-DD' format, or None if an error occurs.
-    """
     target_dt = date.fromisoformat(target_date_str)
     # Check a window around the target date for the calendar
     calendar_start = (target_dt - timedelta(days=10)).strftime("%Y-%m-%d")
@@ -298,84 +293,3 @@ def apply_kalman_filter(prices: pd.Series, span: int = 10) -> pd.Series:
     smoothed = prices.ewm(span=span, adjust=False).mean()
     smoothed.name = getattr(prices, "name", "smoothed")
     return smoothed
-
-
-def _compute_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
-    """Compute ADX and directional indicators without external libraries."""
-
-    high = df["high"].astype(float)
-    low = df["low"].astype(float)
-    close = df["close"].astype(float)
-
-    up_move = high.diff()
-    down_move = low.shift(1) - low
-
-    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
-    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
-
-    tr_components = pd.concat(
-        [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
-        axis=1,
-    )
-    true_range = tr_components.max(axis=1)
-
-    atr = true_range.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
-    plus_di = (
-        pd.Series(plus_dm, index=df.index)
-        .ewm(alpha=1 / period, min_periods=period, adjust=False)
-        .mean()
-        / atr
-    ) * 100
-    minus_di = (
-        pd.Series(minus_dm, index=df.index)
-        .ewm(alpha=1 / period, min_periods=period, adjust=False)
-        .mean()
-        / atr
-    ) * 100
-
-    directional_sum = (plus_di + minus_di).replace(0, np.nan)
-    dx = (plus_di - minus_di).abs() / directional_sum * 100
-    adx = dx.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
-
-    return pd.DataFrame(
-        {
-            f"adx_{period}": adx,
-            f"dmp_{period}": plus_di,
-            f"dmn_{period}": minus_di,
-        }
-    )
-
-
-def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Adds a minimal set of technical indicators using pandas-native
-    calculations so we can avoid heavy third-party dependencies during
-    prototyping.  The function keeps the previous column names to remain
-    compatible with existing strategy code.
-
-    Args:
-        df (pd.DataFrame): DataFrame with 'open', 'high', 'low', 'close' columns.
-
-    Returns:
-        pd.DataFrame: The DataFrame with added indicator columns.
-    """
-    if not all(col in df.columns for col in ["high", "low", "close"]):
-        logger.error(
-            "DataFrame is missing required columns ('high','low','close') for TA."
-        )
-        return df
-
-    logger.info("Adding technical indicators (SMA, EMA, ADX) using pandas only...")
-    df["sma_20"] = df["close"].rolling(window=20, min_periods=20).mean()
-    df["sma_50"] = df["close"].rolling(window=50, min_periods=50).mean()
-    df["ema_12"] = df["close"].ewm(span=12, adjust=False).mean()
-
-    adx_df = _compute_adx(df, period=14)
-    df = df.join(adx_df)
-
-    required = ["ema_12", "adx_14"]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise RuntimeError(f"Technical indicators missing after TA step: {missing}")
-
-    return df

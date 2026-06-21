@@ -48,7 +48,7 @@ def analyze_optimization_results(optimized_results, param_names, initial_cash: f
             logger.warning(
                 "Skipping an empty or None result set from an optimization run."
             )
-            error_row = {name: "ErrorRun" for name in param_names}
+            error_row = dict.fromkeys(param_names, "ErrorRun")
             error_row.update(
                 {
                     "Final Value": None,
@@ -70,7 +70,7 @@ def analyze_optimization_results(optimized_results, param_names, initial_cash: f
             if strategy_instance is None:
                 logger.warning("Skipping a None strategy instance within a run result.")
                 # Use default values, as parameter retrieval would fail.
-                error_row = {name: "ErrorRun" for name in param_names}
+                error_row = dict.fromkeys(param_names, "ErrorRun")
                 error_row.update(
                     {
                         "Final Value": None,
@@ -94,7 +94,7 @@ def analyze_optimization_results(optimized_results, param_names, initial_cash: f
                 logger.error(
                     f"Could not retrieve parameters from strategy_instance: {param_e}"
                 )
-                param_values = {name: "ParamError" for name in param_names}
+                param_values = dict.fromkeys(param_names, "ParamError")
 
             try:
                 # Check if the strategy_instance has an 'analyzers' attribute.

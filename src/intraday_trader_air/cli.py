@@ -92,8 +92,7 @@ def _resolve_command(argv: Sequence[str]) -> tuple[str, list[str]]:
     if command == "backtest":
         if len(argv) < _MIN_ARGS:
             raise CommandNotFoundError(
-                f"missing backtest command. "
-                f"Available: {_available(_BACKTEST_COMMANDS)}"
+                f"missing backtest command. Available: {_available(_BACKTEST_COMMANDS)}"
             )
         subcommand = argv[1]
         target = _BACKTEST_COMMANDS.get(subcommand)
@@ -107,8 +106,7 @@ def _resolve_command(argv: Sequence[str]) -> tuple[str, list[str]]:
     if command == "data":
         if len(argv) < _MIN_ARGS:
             raise CommandNotFoundError(
-                f"missing data command. "
-                f"Available: {_available(_DATA_COMMANDS)}"
+                f"missing data command. Available: {_available(_DATA_COMMANDS)}"
             )
         subcommand = argv[1]
         target = _DATA_COMMANDS.get(subcommand)

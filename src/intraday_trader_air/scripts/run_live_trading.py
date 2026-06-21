@@ -2,17 +2,15 @@ import asyncio
 import logging
 import os
 import random
-import re
 import signal
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import websockets
-import yaml
-from dotenv import load_dotenv
 
 from intraday_trader_air.broker_handler import BrokerAPIHandler
+from intraday_trader_air.configuration import load_app_config
 from intraday_trader_air.consistency_validator import ConsistencyValidator
 from intraday_trader_air.exception_handler import (
     ErrorCategory,
@@ -180,7 +178,7 @@ class EnhancedTradingSystem:
             synthetic_backtest = {
                 "trades": [
                     {
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                         "symbol": self.trading_state.symbol,
                         "side": side.lower(),
                         "quantity": 0.0,
@@ -191,7 +189,7 @@ class EnhancedTradingSystem:
             synthetic_live = {
                 "trades": [
                     {
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                         "symbol": self.trading_state.symbol,
                         "side": side.lower(),
                         "quantity": filled_qty,
@@ -382,7 +380,7 @@ class EnhancedTradingSystem:
         except Exception as e:
             logger.error(f"[WebSocket EVENT] Error in handle_trade_update: {e}")
             self.exception_handler.handle_exception(
-                e, ErrorCategory.TRADING, ErrorSeverity.HIGH
+                e, ErrorCategory.ORDER_EXECUTION, ErrorSeverity.HIGH
             )
 
     async def handle_trade(self, trade_data):
@@ -460,7 +458,7 @@ class EnhancedTradingSystem:
 
         except Exception as e:
             logger.error(f"Risk check failed: {e}")
-            return True
+            return False
 
     @handle_exceptions(ErrorCategory.ORDER_EXECUTION, ErrorSeverity.HIGH)
     def _execute_trade(self, signal: str, current_price: float):
@@ -473,16 +471,17 @@ class EnhancedTradingSystem:
         baseline_cash = self.trading_state.last_known_cash
         baseline_position = self.trading_state.current_position_qty
 
-        strategy_name = (
-            "mean_reversion"  # dynamically get the currently running strategy
-        )
-        strategy_config = self.app_config["strategies"][strategy_name]
+        # Determine strategy name and order quantity from config
+        live_trading_config = self.app_config.get("live_trading", {})
+        strategy_name = live_trading_config.get("strategy", "mean_reversion")
+        default_qty = live_trading_config.get("default_order_qty", 10)
+        strategy_config = self.app_config.get("strategies", {}).get(strategy_name, {})
         order_settings = strategy_config.get("order_settings", {})
 
         # --- Determine order parameters based on signal and configuration ---
         order_params = {
             "symbol": self.trading_state.symbol,
-            "qty": 10,
+            "qty": order_settings.get("default_qty", default_qty),
             "time_in_force": "day",
             "client_order_id": f"{'no-fill-test' if is_test_mode else 'live'}_{uuid.uuid4()}",
         }
@@ -600,31 +599,6 @@ class EnhancedTradingSystem:
         try:
             # Initialize components
             self.initialize_components()
-
-            # Get initial account and position state
-            logger.info("Fetching initial account and position state...")
-            try:
-                account_info = self.broker_handler.get_account_info()
-                if account_info:
-                    self.trading_state.update_cash_and_value(
-                        float(account_info.cash), float(account_info.portfolio_value)
-                    )
-                else:
-                    logger.warning("Could not fetch initial account info.")
-
-                position_info = self.broker_handler.get_position(
-                    self.trading_state.symbol
-                )
-                if position_info:
-                    self.trading_state.update_position(float(position_info.qty))
-                else:
-                    logger.info(
-                        f"No initial position found for {self.trading_state.symbol}."
-                    )
-                    self.trading_state.update_position(0.0)
-
-            except Exception as e:
-                logger.error(f"Error fetching initial state: {e}", exc_info=True)
 
             # Get initial account and position state
             logger.info("Fetching initial account and position state...")
@@ -922,7 +896,10 @@ class EnhancedTradingSystem:
                     )
 
                     # --- START OF NEW PRE-TRADE CHECKS ---
-                    order_qty = 10  # Example fixed quantity
+                    default_qty = self.app_config.get("live_trading", {}).get(
+                        "default_order_qty", 10
+                    )
+                    order_qty = default_qty
                     trade_value = order_qty * current_price
 
                     # 1. Liquidity and Impact Check
@@ -1070,8 +1047,12 @@ class EnhancedTradingSystem:
                         break
                 logger.info("Data queue cleared")
 
-            # Generate final report
-            final_report = self.generate_comprehensive_report()
+            # Generate final performance summary
+            final_report = (
+                self.performance_analyzer.generate_performance_report()
+                if hasattr(self.performance_analyzer, "generate_performance_report")
+                else {}
+            )
 
             # Export reports
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1097,45 +1078,6 @@ class EnhancedTradingSystem:
         except Exception as e:
             logger.error(f"Error occurred while stopping trading system: {e}")
             return {"error": str(e)}
-
-
-def load_app_config(config_path="config.yml"):
-    """
-    Load application configuration from YAML file with environment variable substitution.
-    """
-    load_dotenv()
-
-    try:
-        with open(config_path, encoding="utf-8") as file:
-            config_content = file.read()
-
-        # Substitute environment variables
-        def replace_env_vars(match):
-            env_var = match.group(1)
-            return os.getenv(env_var, match.group(0))
-
-        config_content = re.sub(r"\$\{([^}]+)\}", replace_env_vars, config_content)
-
-        # Parse YAML
-        config = yaml.safe_load(config_content)
-
-        logger.info(f"Configuration loaded successfully from '{config_path}'.")
-        return config
-
-    except FileNotFoundError:
-        logger.error(f"Configuration file not found: {os.path.abspath(config_path)}")
-        logger.error(
-            "Please ensure you are running this command from the project's root directory."
-        )
-        raise
-    except yaml.YAMLError as e:
-        logger.error(f"Error parsing YAML configuration in '{config_path}': {e}")
-        raise
-    except Exception as e:
-        logger.error(
-            f"An unexpected error occurred while loading configuration from '{config_path}': {e}"
-        )
-        raise
 
 
 async def shutdown(sig, loop):
@@ -1185,8 +1127,16 @@ def main():
     Main entry point for the live trading script.
     Sets up the asyncio event loop and runs the trading session.
     """
-    # 1. First load configuration
-    app_config = load_app_config()
+    # 1. First load configuration (using project-standard loader)
+    from pathlib import Path
+
+    app_config_raw = load_app_config(Path("config.yml"))
+
+    # Convert structured AppConfig to dict for backward compatibility
+    # with EnhancedTradingSystem which expects a dict
+    from dataclasses import asdict
+
+    app_config = asdict(app_config_raw)
 
     # 2. Use loaded configuration to set up logging system
     log_config = app_config.get("logging", {})

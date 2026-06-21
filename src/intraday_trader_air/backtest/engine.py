@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import logging
-from statistics import fmean
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from statistics import fmean
+from typing import Any
 
 import backtrader as bt
 import numpy as np
 
 from intraday_trader_air.backtest_utils import analyze_optimization_results
-from intraday_trader_air.exception_handler import ExceptionHandler
-from intraday_trader_air.performance_analyzer import PerformanceAnalyzer
-from intraday_trader_air.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
 
@@ -42,24 +40,6 @@ def run_backtest(request: BacktestRequest) -> tuple[bt.Cerebro, dict[str, Any]] 
 
     single_run_params = dict(request.single_run_params or {})
     opt_param_values = dict(request.opt_param_values or {})
-
-    risk_manager = None
-    performance_analyzer = None
-    exception_handler = None
-
-    if request.enable_enhanced_features:
-        try:
-            risk_manager = RiskManager(request.risk_config or {})
-            performance_analyzer = PerformanceAnalyzer(
-                initial_capital=request.initial_cash
-            )
-            exception_handler = ExceptionHandler()
-            logger.info("Enhanced feature components initialized successfully")
-        except Exception as exc:  # pragma: no cover - defensive logging path
-            logger.warning(
-                "Enhanced feature initialization failed, using basic mode: %s", exc
-            )
-            request.enable_enhanced_features = False
 
     cerebro = bt.Cerebro()
     cerebro.adddata(request.data_feed)

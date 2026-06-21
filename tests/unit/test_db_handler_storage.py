@@ -49,9 +49,7 @@ def test_sqlite_uses_insert_or_replace_when_upsert_unavailable(tmp_path):
     handler.save_market_data(updated, "AAPL")
 
     with handler.engine.connect() as conn:
-        stored = pd.read_sql(
-            text("SELECT * FROM market_data ORDER BY timestamp"), conn
-        )
+        stored = pd.read_sql(text("SELECT * FROM market_data ORDER BY timestamp"), conn)
 
     assert len(stored) == 2
     stored["timestamp"] = pd.to_datetime(stored["timestamp"])
@@ -95,4 +93,3 @@ def test_parquet_upsert_deduplicates_rows(tmp_path):
     assert len(stored) == 2
     stored_sorted = stored.sort_values("timestamp").reset_index(drop=True)
     assert pytest.approx(stored_sorted.loc[0, "close"]) == 555.5
-

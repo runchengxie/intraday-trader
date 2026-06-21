@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
+from unittest import mock
 
 import pytest
-import unittest.mock as mock
 
 from intraday_trader_air.configuration import AppConfig, load_app_config
 
@@ -91,7 +91,7 @@ def mocker():
     active_patchers: list[object] = []
 
     class _PatchProxy:
-        def __init__(self, outer: "_Mocker") -> None:
+        def __init__(self, outer: _Mocker) -> None:
             self._outer = outer
 
         def __call__(self, target, *args, **kwargs):

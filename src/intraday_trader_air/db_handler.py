@@ -214,9 +214,7 @@ class DBHandler:
             for column, sql_type in required_columns.items():
                 if column not in existing:
                     conn.execute(
-                        text(
-                            f"ALTER TABLE market_data ADD COLUMN {column} {sql_type};"
-                        )
+                        text(f"ALTER TABLE market_data ADD COLUMN {column} {sql_type};")
                     )
                     logger.info(
                         "Added missing column '%s' to market_data table.", column
@@ -681,6 +679,6 @@ class DBHandler:
 __all__: list[str] = [
     "DBHandler",
     "MarketData",
-    "TradeLog",
     "PerformanceSnapshot",
+    "TradeLog",
 ]
