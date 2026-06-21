@@ -1,103 +1,51 @@
-# Final Project Brief
+# 最终项目简报要求归档
 
-> **课堂参考**：本简报保留课堂背景信息，与当前仓库的实际开发流程并无直接绑定，请以 README 与贡献指南为准。
+> 课程资料归档：本文整理自课程简报。它解释项目背景，不直接约束当前仓库的开发流程。
 
-Kannan Singaravelu, CQF
+## 简报主题
 
----
+课程简报主要覆盖：
 
-## In this tutorial
+- 学术诚信。
+- 项目预期。
+- 报告和提交要求。
+- 编程环境和语言限制。
 
-* Academic Integrity Guidelines
+## 学术诚信
 
-* What Is Expected of You
+课程要求所有提交内容必须由学生独立完成，并能解释清楚。直接复制课堂代码、共享脚本或他人内容，会被视为严重问题。报告也不能只展示代码输出和数字，需要包含自己的分析、解释和结论。
 
-* Project Report & Submission Requirements
+原课程还明确限制使用 AI 写作或生成内容完成考试。这个限制属于课程规则。当前仓库的文档和开发协作可以使用工具辅助，但最终提交到课程平台时必须遵守课程平台自己的规定。
 
-* Coding Environment / Language
+## 项目预期
 
----
+合格项目应体现：
 
-## Academic Integrity Guidelines
+- 能理解并解释自己写的代码。
+- 有清楚的数据、方法和结果分析。
+- 有测试用例、图表和稳健性讨论。
+- 能说明模型选择、参数选择和实现局限。
+- 体现独立思考和诚实工作量。
 
-* **Originality is Non-Negotiable**
+## 报告要求
 
-* All work submitted whether for exams or projects must be entirely original.
+报告长度没有固定页数，但内容需要有分析质量。适合包含：
 
-* Submissions showing any signs of duplication, plagiarism, or lack of individual effort will be automatically disqualified.
+- 数学模型。
+- 数值方法。
+- 收敛性、精度和计算成本说明。
+- 图表和测试用例。
+- 与相关研究或经验结果的比较。
+- 稳健性、敏感性和回测分析。
 
-* Submissions will be rejected if they include:
+数学内容可以用 LaTeX 或 Word 公式编辑器完成。
 
-  * directly copied Python code, including from coursework notes and shared scripts
+## 编程环境
 
-  * no explanation, analysis, or evidence of thought process, and
+原课程对部分机器学习和深度学习题目要求使用 Python，并建议模块化、可复现。对于深度学习模型，课程指定使用 TensorFlow 和 Keras API，并限制使用 PyTorch。
 
-  * blind replication of solutions without demonstrating understanding
+这些约束是课程规则。当前仓库的实际依赖以 `pyproject.toml` 为准，核心项目使用 Python 3.10、Backtrader、Pandas、NumPy、SQLAlchemy、Alpaca SDK 和 Streamlit 可选依赖。
 
----
+## 与本仓库的关系
 
-## Academic Integrity Guidelines 2
-
-* **Use of ChatGPT, LLM Apps, or AI Writing Tools is Strictly Prohibited**
-
-* Any AI-generated content for completing exams or projects is strictly forbidden and will result in automatic disqualification.
-
-* Anyone found violating this rule will face disciplinary action, which may include:
-
-  * immediate rejection of the submission,
-
-  * a grade of zero for the assessment, and
-
-  * formal academic misconduct proceedings as per institutional policy
-
----
-
-## What Is Expected of You
-
-* You are required to:
-
-  * understand and explain the code you write,
-
-  * provide clear analysis, insights, and documentation, and
-
-  * show independent thinking and honest effort in all submissions
-
-* Submissions that fail to meet these standards will be considered non-serious, unethical, and subject to penalties.
-
----
-
-## Report & Submission Requirements
-
-* Submit working code together with a well-written report and originality declaration.
-
-* There is no set page length. Report must have an analytical quality and discussion of results/robustness/sensitivity/backtesting as appropriate to the topic.
-
-  * Use charts, test cases and comparison to empirical research papers where available.
-
-* Report must contain sufficient mathematical model, numerical methods with attention to their convergence/accuracy/computational properties. Make a table of list down all numerical techniques you coded or used.
-
-* Mathematical sections can be prepared using LaTeX or Equation Editor (Word).
-
-* Printing out jupyter notebook code and numbers on multiple pages, without your own analysis text, explained plots, relevant maths is not an acceptable format.
-
----
-
-## Report & Submission Requirements 2
-
-### Coding Environment
-
-* Use only Python for coding environment / language for both Machine & Deep Learning projects.
-
-* Code reproducibility is a must and the use of modular programming approaches is recommended.
-
-* Do not recode existing indicators, libraries.
-
-* Use only TensorFlow, Keras API for model building.
-
-* **Do not use PyTorch.**
-
-* Final Project report should be in PDF format ONLY. Supporting and working files like .html, .docx, .ipynb or .py files cannot be construed as the final report.
-
-* Submission Requirements: ONLY one zip file should be submitted including the final project report.
-
-  * *ML John Smith REPORT.pdf and ML John Smith CODE.zip*
+本仓库的主题对应算法交易方向，已经实现可运行的策略、回测、数据存储、风控和纸上交易联调框架。课程简报可以帮助理解需求来源，但维护项目时应优先参考根目录文档和代码现状。

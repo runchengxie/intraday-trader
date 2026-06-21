@@ -1,30 +1,45 @@
-# Algorithmic Trading for Reversion and Trend-Following
+# 均值回归与趋势跟随补充资料
 
-> **课堂参考**：此指南保留课堂作业中的补充说明，当前仓库采纳部分思路，但具体执行细节以最新代码与文档为准。
+> 课程资料归档：本文整理自课程补充笔记，用来解释策略设计、风险评估和绩效归因思路。当前仓库的真实功能以 `README.md`、`AGENTS.md` 和代码为准。
 
-## Introduction
+## 策略目标
 
-Part I. Implement at least (a) one mean-reversion strategy with a specific indicator of your choice AND (b) one trend-following strategy with several indicators of your choice. Rule-based strategy code to produce P&L plot.
+课程要求至少实现一类均值回归策略和一类趋势跟随策略，并用规则化代码生成 P&L 曲线。后续阶段可以把历史回测扩展到接近实盘的事件驱动测试，重点检查订单处理、成交状态、撤单、部分成交和券商返回信息的一致性。
 
-Event-driven backtesting / life-like testing in Parts II and III. Code must have routines on order handling, including re-verification of server responses (eg, order cancelled, partially filled, returned with an incorrect info).
+当前项目已经实现三类策略：
 
-## Simple but Effective Trend Following in FX
+- `MeanReversionZScoreStrategy`：用滚动 Z-Score 判断价格偏离均值的程度。
+- `EMACrossoverStrategy`：用 EMA 交叉识别趋势，并用 ADX 过滤弱趋势。
+- `CustomRatioStrategy`：比较当前价格与长期均线的比例。
 
-* **Step 1:** resample the prices at regular intervals (eg, 30 seconds); can use `pandas` resample method.
+## 简单趋势指标
 
-* **Step 2:** calculate an average price over the longer period (eg, past five-minute intervals). Implement trading logic to open a position when market prices deviate from that average, and close the position when prices revert back to it.
+一个常见的趋势跟随思路如下：
 
-* **Step 3:** compute the ratio of the short-term average to the long-term average price. No trend is signaled by the ratio of 1, short-term prices ≈ the long-term prices. Uptrend signaled by the ratio above 1, and downtrend by less than 1.
+1. 按固定间隔重采样价格，例如 30 秒、1 分钟或 15 分钟。
+2. 计算较长窗口内的平均价格，例如 5 分钟均价。
+3. 计算短期价格或短期均价与长期均价的比例。
+4. 比例接近 1 时，说明短期价格接近长期均价。比例大于 1 表示偏强，比例小于 1 表示偏弱。
 
-## Trend-Following Indicators
+在 pandas 中可以使用 `DataFrame.resample()` 完成重采样。
 
-Common indicators: Moving Averages, Exponential Moving Averages (EMA), Average Directional Index (ADX).
+## 趋势跟随指标
 
-EMAt = αPt + (1 − α)EMAt-1
+常见趋势指标包括移动均线、指数移动均线（EMA）、平均趋向指数（ADX）和 MACD。
 
-choice of α is practical, discussed in TUT Market Prediction.
+EMA 的递推形式：
 
-MACD = EMAshort − EMAlong
+```text
+EMA_t = αP_t + （1 − α）EMA_{t-1}
+```
+
+MACD 的常见形式：
+
+```text
+MACD = EMA_short − EMA_long
+```
+
+示例代码：
 
 ```python
 data['EMA_12'] = data['Close'].ewm(span=12, adjust=False).mean()
@@ -32,170 +47,84 @@ data['EMA_26'] = data['Close'].ewm(span=26, adjust=False).mean()
 data['MACD'] = data['EMA_12'] - data['EMA_26']
 ```
 
-## Broker API - REST
+## Broker API
 
-1. Alpaca, IB Web, and Oanda. Alpaca REST API is free and includes asynchronous events handling based on WebSocket and Server Side Events (SSE).
+REST API 适合历史数据、账户信息、普通下单和订单状态查询。Alpaca、Interactive Brokers Web API 和 Oanda 都提供类似接口。REST 请求通常使用 `GET`、`POST`、`PUT` 等 HTTP 方法。
 
-2. Utilizes HTTP methods, eg GET (retrieve data), POST (create new data), PUT (update data). Useable for non-time-critical operations such as retrieving historical data, account information, placing orders, and getting order status.
+FIX API 面向更低延迟的交易场景，支持订单提交、撤单、成交回报和行情分发。它更接近机构级交易基础设施，使用成本和维护成本也更高。
 
-## Broker API - FIX
+本项目当前使用 Alpaca REST 与 WebSocket，适合纸上交易和教学级联调。真正的低延迟交易还需要行情源、网络链路、托管位置、订单路由和券商限流等额外设计。
 
-1. The more industrial strength and lower latency API choice is FIX (Financial Information eXchange). A messaging protocol designed for the real-time exchange.
+## 风险管理
 
-2. Supports submission and cancellation of various order types, trade execution reports, and market data dissemination – all for high frequency trading. FIX is used by large institutions, funds, and broker/dealers.
+日内策略至少要关注这些风险：
 
-## Risk Management
+- 数据质量：时间戳重复、缺失 bar、空值、异常价格跳变。
+- 流动性：成交量不足、点差过宽、订单参与率过高。
+- 杠杆与敞口：总敞口、净敞口、单标的集中度。
+- 市场冲击：订单规模越大，越可能推高成交成本。
+- 订单状态：部分成交、撤单失败、券商返回状态延迟或不一致。
 
-* **Data Work and Features.** Retrieving historical data, tick data, candles data.
+当前项目中，`RiskManager` 已覆盖 VaR、流动性、市场冲击、杠杆、敞口和基础行情有效性检查。
 
-* **Systematic Backtesting** (eg, concentration in asset, Beta-to-SPY) are of no utility for this type of algo trading project, however for overall performance evaluation it's useful to provide a tearsheet with information about turnover.
+## 绩效评估
 
-    1. Compute Drawdowns, Sharpe Ratio and Value-at-Risk as adapted (it is over the period, which can include unequal number of transactions).
+仅看最终收益容易误导。更稳妥的做法是同时检查：
 
-    2. Consider computation of Kelly Criterion for bet size.
+- 累计 P&L。
+- 最大回撤。
+- 夏普比率。
+- VaR 和 CVaR。
+- 换手率。
+- 交易成本。
+- 胜率和盈亏比。
+- 收益是否集中在少数交易或少数时间段。
 
-READING *Python for Finance Mastering Data-Driven Finance* by Yves Hilpisch.
+`PerformanceAnalyzer` 已经提供风险指标、交易成本、换手率、集中度和相对基准表现的计算入口。
 
-## Algorithmic Flow
+## Alpha、Beta 与因子
 
-* Optionally, introduce liquidity and algorithmic flow considerations (a model of order flow). How would you be entering and accumulating the position? What impact *your transactions* will make on the market order book?
+Beta 表示策略对市场因子的暴露。Alpha 表示扣除市场因子影响后的超额收益。简单单因子模型可以写成：
 
-* Related issue is the possible leverage for the strategy. While the maximum leverage is 1/Margin, the more adequate solution is a maximally leveraged market-neutral gain or alpha-to-margin ratio.
+```text
+R_S,t = α + βR_M,t + ε_t
+```
 
-    AM = α / Margin
+如果要把策略收益拆成市场、价值、规模、动量等来源，可以扩展为多因子回归：
 
-## Developing a Trading Business
+```text
+R_S,t = α + β_M R_M,t + β_HML R_HML,t + ε_t
+```
 
-There are libraries for anything: data processing, times series and techniques from ML, and tear sheets/trading analytics.
+常见因子包括：
 
-## EXTRA. Trading Strategy Evaluation - relevant to topics TS, ML, and AL
+- UMD：动量因子。
+- SMB：小盘减大盘因子。
+- HML：价值因子。
+- RMW：盈利能力因子。
+- CMA：投资风格因子。
 
-* Systematic Backtesting: alpha and rolling beta. Drawdown Control
+本项目当前没有内置因子回归模块。如果后续要做策略归因，可以在 `PerformanceAnalyzer` 或新模块中加入滚动 beta、信息比率和多因子回归。
 
-* Ratios and Scorecards
+## 回撤与风险预算
 
-* (Algorithmic Trading Efficiency)
+回撤可以用历史高水位与当前组合价值计算：
 
-`https://github.com/stefan-jansen/pyfolio-reloaded`
+```text
+DD_t = （HWM_t − P_t）/ HWM_t
+```
 
-## Systematic Backtesting
+其中 `HWM_t` 是截至当前时点的历史最高组合价值，`P_t` 是当前组合价值。策略设计时可以预先设定最大可接受回撤，并把当日 VaR 与当前回撤一起纳入风险预算。
 
-1. We will look at **how to relate P&L** to the market and factors, to understand what drives P&L, what you make money on.
+## Python 生态
 
-2. Then, we will talk about **evaluating P&L** with drawdown control and VaR.
+可参考的工具方向：
 
-3. You can look for suitable models for algorithmic **order flow** and liquidity impact. [Optional]
+- `pandas` 与 `numpy`：数据处理和数值计算。
+- `backtrader`：事件驱动回测。
+- `matplotlib`：图表输出。
+- `streamlit`：仪表盘。
+- `sqlalchemy`：数据库访问。
+- `pyfolio-reloaded`：绩效 tear sheet 思路参考。
 
-## Alpha and Beta
-
-**Beta** is the strategy's market exposure, for which you should not pay much as it is easy to gain by buying an ETF or index futures contract.
-
-**Alpha** is the excess return after subtracting return due to market movements.
-
-RSt = α + βRMt + εt
-
-E[RSt − βRMt] = α
-
-**RMt = Rt − rƒ** is the time series of returns representing **the market factor**.
-
-## Risk-Reward Ratios
-
-**Information Ratio (IR)** focuses on risk-adjusted *abnormal* return, the risk-adjusted alpha!
-
-α / σ(ε)
-
-(That doesn't tell us how much dollar alpha is there. It can be eaten by transaction costs.)
-
-**Sharpe Ratio** measures return per unit of risk. Familiar form:
-
-E(Rt − rƒ) / σ(Rt − rƒ)
-
-## Factors
-
-Evaluating performance **against factors** is the central part of the backtesting.
-
-We saw the separation of alpha and beta in regression *wrt* one market factor
-
-RSt = α + βRMt + εt
-
-We see that a `factor` is a time series of changes, similar to the series of asset returns.
-
-## Named Factors
-
-* **Up Minus Down (UMD)** or **momentum** factor would leverage on stocks that are going up. The recent month's returns are excluded from calculation to avoid a spurious signal.
-
-* **Small Minus Big (SMB)** factor shorts large cap stocks, so βSMB measures the tilt towards small stocks.
-
-* Long-short **High Minus Low (HML)** or **value** factor: buy top 30% of companies with the high book-to-market value and sell the bottom 30% (expensive stocks).
-
-1) Except for HML, the impact/presence of other factors questionable.
-
-2) Since 2015, Fama-French moved to 5-factor model that include profitability RMW and investment CMA but ignore the proper 3) Momentum factor and 4) Low Volatility (Betting Against Beta) factors.
-
-## Factors Backtesting
-
-So how do we check against those factors?
-
-Set up a regression!
-
-RSt = α + βM RMt + βHML RHMLt + εt
-
-where RHMLt is return series from the long-short HML factor.
-
-* We can **add factors** to this regression.
-
-* We can have **rolling estimates** of these betas for each day/week.
-
-## Factors Backtesting (Advanced)
-
-* Scale returns to have the same volatility as the benchmark – put on the same plot for correct comparison.
-
-* Rolling Sharpe Ratio – changes **not** desirable).
-
-* Rolling market factor beta – β > 1 **not** desirable.
-
-* Rolling betas *wrt* to UMD (momentum), SMB, and industry sectors.
-
-## Drawdowns
-
-The drawdown is the cumulative percentage loss, given the loss in the initial timestep.
-
-Let's define the highest past peak performance as High Water Mark
-
-DDt = (HWMt - Pt) / HWMt
-
-where Pt is the cumulative return (or portfolio value Πt).
-
-It makes sense to evaluate a maximum drawdown over past period maxt≤T DDt.
-
-## Drawdown Control
-
-The strategy must be able to survive without running into a close-out.
-
-It makes sense to pre-define Maximum Acceptable Drawdown (MADD) and trace
-
-VaRt ≤ MADD – DDt
-
-where VaRt is today's VaR and DDt is current drawdown.
-
-## Backtesting for Risk and Liquidity
-
-1. Does cumulative P&L behave as expected (eg, for a coint pair trade)? Behavior of risk measures (volatility/VaR/Drawdown)?
-
-2. Is P&L coming from a few large trades or many smaller trades? Does all profit come from a particular period. Concentration in assets and its attribution - as intended?
-
-3. Turnover - good or bad for your stat arb/algo strat/allocation? Impact of transaction costs (slippage). Plot P&L value (or alpha) vs. Ntransactions.
-
-## Python Ecosystem
-
-### The Quant Finance PyData Stack
-
-Source: [Jake VanderPlas: State of the Tools](https://www.youtube.com/watch?v=5GINDD7qbP4)
-
-Github examples below might be no longer updated. Given to showcase the useful elements of systematic backtesting: **a.** rolling beta *wrt* S&P500 plot, **b.** rolling Sharpe Ratio, and **c.** various ratios in scorecards.
-
-1. `github.com/quantopian/ALPHALENS`
-    `github.com/quantopian/alphalens/blob/master/alphalens/examples/alphalens_tutorial_on_quantopian.ipynb`
-
-2. `github.com/quantopian/PYFOLIO`
-    `quantopian.github.io/pyfolio/notebooks/single_stock_example/`
+第三方库能节省时间，但策略逻辑、数据质量和交易假设仍然要自己解释清楚。

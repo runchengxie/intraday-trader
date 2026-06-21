@@ -1,81 +1,79 @@
-# Algorithmic Trading for Reversion and Trend-Following v2025
+# 均值回归与趋势跟随算法交易课程要求
 
-> **课堂参考**：本文档系课堂原始项目要求，现存于仓库中仅供灵感参考；落地实现与优先级以主项目规划为准。
+> 课程资料归档：本文整理自 2025 年算法交易课程题目，用来保留项目来源和研究背景。当前仓库的功能、运行方式和贡献规范以 `README.md` 与 `AGENTS.md` 为准。
 
-Algorithmic trading in HFT space is concerned with how to optimally run the core strategies focusing on execution. The issues of order types as allowed by broker/exchange, slippage, incorrect messages from a broker, and own high-frequency data storage (15 Min and less) – can disturb any strategy, and you address them in Part III (last but not the least). However, this is a quantitative study. With attention to mathematics and application detail (e.g., sample period/time window experiment) implement at least two kinds of (a) trend-following strategy with several indicators of your choice AND (b) reversion strategy with an indicator of your choice. This is Part I and you can do it as a historic back-test.
+## 总体目标
 
-In Parts II and III extend the strategies from back-testing to some degree of live-testing to test simple scripts with Broker API of your choice. However, if specific Broker API/language learning curve is steep, you can limit the scope – Part II covers more detail. Real-time trading relies on loops which check for buy/sell signal, and to improve the performance more optimized languages than Python are used in the industry, e.g. GoLang.
+题目要求围绕日内或较高频率数据，研究趋势跟随和均值回归策略。重点包括：
 
-A. The trading code must handle exceptions: failures during the order execution and inconsistent/incorrect information received back from the broker (e.g., order filled when it wasn't, mismatch in order type).
-B. Trading overall should consider liquidity, market impact, and sudden market events – though you are not likely to be in position to affect the market but consider:
+- 用历史数据完成策略回测。
+- 解释指标、信号和参数选择。
+- 比较不同采样频率、窗口长度和市场状态下的表现。
+- 逐步扩展到接近实盘的 API 联调。
+- 处理订单状态、异常返回、部分成交和数据质量问题。
+- 讨论流动性、市场冲击和突发市场事件。
 
-1. changes in price and volume (market impact, liquidity regime);
+当前仓库已经把这些要求落到以下模块：策略实现位于 `strategies/`，回测入口位于 `backtest/` 和 `scripts/run_backtests.py`，券商接入位于 `broker_handler.py`，风控位于 `risk_manager.py`，一致性检查位于 `consistency_validator.py`。
 
-2. order-specific events, subject to information about execution from API.
+## 第一部分：历史回测
 
-## Trend-Following Strategy
+需要至少实现：
 
-Trend-following strategies aim to capitalize on sustained movements in the market. The indicators such as the Moving Averages, Exponential Moving Averages (EMA) and Average Directional Index (ADX) to confirm trends. The ADX measures the strength of a trend, helping to filter out weak trends that may not be profitable. You can combine moving averages with ADX, in order to generate better quality trading signals.
+1. 一类趋势跟随策略。
+2. 一类均值回归策略。
+3. 清楚说明指标如何计算、信号如何触发、参数如何选择。
+4. 使用历史数据回测，并讨论结果的稳健性。
 
-Experiment with resampling interval and averaging period to assess the effectiveness of your specific trend-following approach. Discuss or better back-test the impact of various market-specific events/liquidity conditions/regime in asset price.
+当前项目中的对应实现：
 
-## Part I: Generic Strategies Made Proprietary
+- `EMACrossoverStrategy`：EMA 短长均线交叉，加 ADX 趋势强度过滤。
+- `CustomRatioStrategy`：价格与长期均线比例策略。
+- `MeanReversionZScoreStrategy`：滚动 Z-Score 均值回归策略。
+- `BuyAndHoldStrategy`：基准策略。
 
-Write code that implements testing on your core strategies, that can be done Python and on historical data (back-testing). Understanding mathematical nuance of indicator, and its back-testing has different purposes, as compared to live-testing which would focus on order slippage, for example. Here, you are not limited to Python, and can use a specialized language + Broker API for Part I as well. There are `Backtrader`, `Zipline`, `PyAlgoTrade` packages but Python doesn't have a ready one solution for our Part I purposes.
+趋势跟随可以使用移动均线、EMA、ADX 或 MACD。均值回归可以使用 Z-Score、OU 过程或其他距离度量。项目当前使用 Z-Score 作为主要均值回归信号，并支持用过滤后的价格序列生成信号。
 
-1. For a core trend-following strategy type, common choices are Exponential Moving Average (EMA) and Average Directional Index (ADX), which is a kind of oscillator. Other approach is a convergence/divergence indicator, Moving Average Convergence/Divergence (MACD). For each strategy, you need to decide on: your own indicator, how it is computed, and what constitutes a trading signal (e.g., crossover of 20D EMA with another).
+## 第二部分：Broker API 与输入数据
 
-2. Simple but practical trend indicator primarily used in FX is of the following design:
+课程要求使用更接近真实交易的数据源和 API，例如 Alpaca、Interactive Brokers 或 Oanda。即使只做历史回测，也应加入数据质量检查，尤其是 15 分钟或更高频率数据。
 
-    * **Step 1:** resample the prices at regular intervals (eg, 30 seconds) for price level or average; Can use `DataFrame.resample`;
+当前项目已经实现：
 
-    * **Step 2:** calculate an average price over the longer period (eg, 5-minute intervals).
+- Alpaca 历史行情拉取。
+- Alpaca REST 账户、订单、持仓接口封装。
+- Alpaca WebSocket 行情和订单更新订阅。
+- 数据质量报告，包括时间戳、缺失 bar、空值和价格跳变检查。
+- `trade_count` 与 `vwap` 的字段回补入口。
 
-    * **Step 3:** compute the ratio of short-term price (or its average) to long-term average price: near 1 signals 'no trend' as short-term prices ≈ the long-term prices. Uptrend is signaled by the ratio above 1, and downtrend by less than 1. Give several calibrations.
+REST API 适合账户查询、历史数据、普通下单和订单状态查询。FIX API 更适合低延迟机构交易，但本仓库当前没有接入 FIX。
 
-    Full mathematical description of indicators chosen and your calibration: experiment with the ratios over different timeframes, frequency.
+## 第三部分：风险与多重测试
 
-3. For a mean-reversion strategy type,
-    * Z* deviation from the price can be used as a simple signal. Or think about distance measures from machine learning.
+课程要求关注市场风险、订单处理风险和系统运行风险。当前仓库的对应能力包括：
 
-    * Formal modeling of mean-reversion with OU process can be invoked expecting the price to mean-revert over short-time.
+- `RiskManager`：检查 VaR、流动性、点差、市场冲击、杠杆、敞口和行情有效性。
+- `ExceptionHandler`：提供重试、熔断和错误记录。
+- `ConsistencyValidator`：比较信号、成交和绩效是否一致。
+- `no_fill_test_mode`：提交远离市场价格的测试单，并在指定时间后撤单。
+- `DBHandler`：保存行情、交易日志和绩效快照。
+- `dashboard_app.py`：展示绩效快照和交易记录。
 
-    * **OPTIONAL** To generate a stable P&L from reversion strategy, it's very likely some kind of filtering needs to be applied to the price (see Topic TS).
+仍需改进的地方：
 
-4. Discussion. Consider the behaviour of the non-stationary price (regime): for example, would the upward trend with more jumps and volatility produce better/worse returns for a mean-reversion?
+- 实盘命令行入口默认还没有接入 `DBHandler`。
+- 停止交易时的最终报告函数尚未实现。
+- 真实撮合延迟、交易所费用、订单簿深度和断路器仍未建模。
 
-## Part II: Broker API and Input data
+## 报告建议
 
-1. Treat this project as more professional, eg, even for a historical back-testing fetch data from OpenBB/brokerage (vs Yahoo!Finance) and write a couple of routines checking data quality. You are encouraged to work with 15-minute and higher-frequency data.
+如果基于该项目写研究报告，可以采用以下结构：
 
-2. The common API choice is REST (Representational State Transfer).
-    * Alpaca, Interactive Brokers Web, and Oanda all have their own versions. In particular, Alpaca REST API is free and includes asynchronous events handling based on WebSocket and Server Side Events (SSE).
-    * REST API is referred to as HTTP API because it utilizes HTTP methods, eg `GET` (retrieve data), `POST` (create new data), `PUT` (update data). Useable for non-time-critical operations such as retrieving historical data, account information, placing orders, and getting order status.
+1. 问题定义：交易标的、频率、数据来源、交易假设。
+2. 方法：指标公式、策略规则、参数范围和风控约束。
+3. 数据：样本区间、缺失处理、复权方式和质量检查。
+4. 回测结果：收益、回撤、夏普、VaR、CVaR、换手率和交易成本。
+5. 稳健性：不同窗口、不同频率、不同市场状态的比较。
+6. 实盘联调：订单状态、异常处理、撤单和一致性验证。
+7. 局限与改进：多标的、交易成本、延迟、行情源和部署方式。
 
-3. The more industrial strength and lower latency API choice is FIX (Financial Information eXchange). A messaging protocol designed for the **real-time** exchange of securities transactions. It supports submission and cancellation of various order types, trade execution reports, and market data dissemination – all for high frequency. FIX is used by large institutions, funds, and broker/dealers.
-
-4. Interactive Brokers offer TWS API with connection to their client application and possibility to use `C++`, `C#`, `Java`, `Python`. A useful comparison at [www.interactivebrokers.com/en/index.php?f=5041](https://www.interactivebrokers.com/en/index.php?f=5041).
-
-Describe order types suitable to your tickers and strategies, and attempt code for order loops and order handling using an API. Set price parameters far from the market to avoid execution. Though, it is absolutely recommended that you do not run any actual live-trading.
-
-## Part III: Evaluate Risk and Test Thrice
-
-An opened market position is exposed to various types of risk. While the market risk can be managed with quant methods like rolling VaR, order-handling risk is more important and reliant on API choices (Part II) as well as dev environment and stack of libraries choices.
-
-1. Containerize and consider docker and cron-style scheduling (think how different parts of your code can be scheduled to run as an independent scripts). Consider implications for running the image of your code data collection, back-test, and trading order loops on a virtual server.
-
-2. Positions Tracking. Code can request account updates (eg, in loop) to provide a secondary confirmation layer.
-
-    * Code must have a **verification** of server responses. From the broker side orders may be partially filled and/or returned with an incorrect fill information (e.g., ticker not bought when it was actually bought).
-
-    * Catch the stale websockets and connection issues.
-
-3. Performance and Risk Reporting. Of less utility to algotrading are `Pyfolio`-style systematic back-testing, scorecards with concentration in asset vs portfolio, Beta-to-SPY. However, do report on P&L performance, turnover, trading costs, and strategy-specific drawdown.
-
-    * One recipe but not mandatory is to present a risk dashboard: run a strategy alike to live for N trading days; save fills and P&L in `TimescaleDB` (your own database); display drawdown, Sharpe, intraday VaR. You can try `Streamlit`.
-
-4. Market Data. Introduce simple checks to catch inconsistencies in market data (downloaded for a back-test or received from the broker live). For example, futures price can't be below spot price, implied quantities can't be negative.
-
----
-
-**The general principle is to preserve the trading capital as much as possible.**
+原则很简单：先保住本金，再谈收益。

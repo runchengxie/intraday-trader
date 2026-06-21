@@ -1,361 +1,302 @@
-# T+0交易机器人
+# Intraday Trader Air
 
-本项目提供一个可服务器部署的Python自动交易机器人，用于开发、回测与部署算法交易策略。默认采用轻量级的SQLite/Parquet缓存，方便在本地快速迭代；当需要更高性能或横向扩展时，可以通过`config.yml`切换到 TimescaleDB。该项目内置风险管理、绩效分析和Alpaca纸上交易API接入（有利于预演策略的效果）等组件
+Intraday Trader Air 是一个基于 Python 3.10 的日内量化交易项目，覆盖策略开发、历史回测、Alpaca 纸上交易接入，以及行情、交易记录和绩效数据的本地与数据库存储。
 
-> ## 注意事项
->
-> 1. 最低净值：券商的实盘的日内交易一般都有≥25,000 美元净值的最低资本要求。
->
-> 2. 如需更快的日内/高频：尽量用SIP（或更直接的专线）而不是仅 IEX 片段数据，例如Alpaca的免费计划默认IEX，付费可用SIP，而IBKR 上真正高频态势通常意味着FIX/CTCI+专线/机房交叉连接，同时接受每月最低佣金门槛。
->
-> 3. 留意相关的风控指标：IBKR 有 OER（提交+修改+撤单 与 成交比）监控，过高会被警告/限流，策略要控制撤单风格。
+项目当前包含 Backtrader 回测框架、三类内置策略加买入持有基准、风险检查、绩效分析、数据质量检查、Streamlit 仪表盘、Docker 与 Docker Compose 运行入口。
 
-## 项目设计思路
+交易相关代码会直接影响资金安全。实盘前请先在 Alpaca Paper Trading 或等价模拟环境中验证策略、风控、订单状态同步和异常处理。日内交易还可能受到最低净值、行情源、券商风控、订单撤改单比例和监管要求影响。代码通过测试只说明程序路径可运行，不能说明策略会赚钱。
 
-### 支持服务器端的远程部署值守交易
+## 当前功能范围
 
-* 多阶段 Docker 构建：`Dockerfile` 使用 builder/runner 双阶段，先在完整镜像中构建 wheel，再在瘦身镜像中安装产物，默认启动命令即为 `run-live`，从构建到运行全流程封装。
+### 策略与回测
 
-* Compose Profiles 分层：`docker-compose.yml` 将 TimescaleDB 与交易服务分别挂在 `db`、`live` profile 下，既可单独调试数据库，也能一次拉起完整实盘栈；健康检查和依赖顺序都已声明。
+- 回测框架使用 Backtrader，统一入口位于 `intraday_trader_air.backtest.engine`。
+- 内置策略包括 `MeanReversionZScoreStrategy`、`EMACrossoverStrategy`、`CustomRatioStrategy` 和 `BuyAndHoldStrategy`。
+- `mean_reversion` 支持滚动 Z-Score、可选 `filtered_close` 输入和限价单参数。
+- `ema_crossover` 使用 EMA 交叉、ADX 过滤和移动止损参数。
+- `custom_ratio` 使用价格与长期均线的比值生成多空信号。
+- 回测输出包括最终资产、交易次数、胜率、净利润、夏普比率、最大回撤、年化收益、VaR、CVaR 和换手率。
+- 基准策略支持价格收益，也支持在 Alpaca 可返回股息数据时计算含股息总回报。
+- 参数优化读取 `config.yml` 中的 `strategies.*.opt_ranges`，并按 `backtest.max_cpus` 控制并行度。
 
-* 输出挂载与 .dockerignore：容器默认把 `./output` 映射到 `/app/output`，配合 `.dockerignore` 隔离本地缓存与敏感文件，便于落地部署。
+### 数据与存储
 
-### 可安装的 CLI 与脚本分发
+- 行情数据通过 Alpaca API 拉取，默认标的、时间窗口和复权方式在 `config.yml` 的 `data` 段配置。
+- `fetch_historical_data` 会优先读取数据库和缓存，缺失时再请求 API，并把结果写回缓存或数据库。
+- `DBHandler` 支持 `sqlite`、`parquet` 和 `postgresql` 三类后端。使用 PostgreSQL 时会尝试创建 TimescaleDB hypertable。
+- `market_data` 表支持 `trade_count` 与 `vwap` 字段。旧缓存缺字段时，回测可自动降级估算，也可设置 `data.require_full_fields: true` 强制报错。
+- `intraday data backfill` 用来回补 `trade_count` 和 `vwap` 等字段。
+- `update-data` 会拉取配置标的在前一日的分钟线，并生成数据质量报告。
+- 数据质量检查覆盖时间戳顺序、重复时间戳、缺失 bar、空值和异常价格跳变。
 
-* `pyproject.toml` 声明 `intraday` 顶层命令，并在其下挂载 `backtest run/optimise/benchmark`、`update-data`、`live` 等子命令，安装后即可在任意环境调用。
+### 实盘联调与仪表盘
 
-* `src/intraday_trader_air/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
+- `intraday live` 启动 `EnhancedTradingSystem`，通过 `BrokerAPIHandler` 连接 Alpaca REST 与 WebSocket。
+- 实盘事件流以 `asyncio.Queue` 为中心，处理 trade、bar 和订单状态更新。
+- 下单前会调用 `RiskManager` 检查流动性、点差、市场冲击、杠杆和敞口。
+- `ConsistencyValidator` 提供回测与实盘信号、成交和绩效的一致性检查工具。
+- `no_fill_test_mode` 可以发出远离市场价格的测试单，并自动撤单，用于验证订单状态流。
+- `intraday dashboard` 启动 Streamlit 仪表盘，从数据库读取交易日志和绩效快照。
 
-### 数据持久化与配置解耦
+### 当前已知局限
 
-* `config.yml` 中的 `database.backend` 支持 `sqlite`、`parquet` 与 `postgresql`，配合 `DBHandler` 可在无需改动代码的情况下切换存储。
-
-* `.env.example`、`.envrc.example` 提供标准化的密钥注入与虚拟环境自动化脚本，支持 `uv`、`pip` 双方案回退。
-
-### 已覆盖的运行场景
-
-| 场景 | 推荐方式 | 说明 |
-| --- | --- | --- |
-| 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .` 后即可使用 CLI，默认包含开发工具链。 |
-| 需要 TimescaleDB、长期运行或团队协作 | Docker（`--profile live`） | 容器一次性拉起交易服务与 TimescaleDB，环境完全可复现。 |
-| 只想调试数据库或接入 BI 工具 | Docker（`--profile db`） | 单独启动 TimescaleDB，供本地脚本或 BI 工具连接。 |
+- `intraday live` 的命令行入口目前没有创建并传入 `DBHandler`，所以实时交易默认主要依赖日志。若要把实盘快照直接写入数据库，需要把数据库句柄接入 `run_trading_session()`。
+- `EnhancedTradingSystem.stop_trading()` 当前调用了尚未实现的 `generate_comprehensive_report()`，停止流程中的最终报告生成还需要补齐。
+- `start_live_trading()` 中存在重复的初始账户与持仓刷新逻辑，功能上影响不大，但后续应清理。
+- Docker 的 `live` profile 会同时启动 TimescaleDB 和交易容器。数据库已经可供数据更新、报表和仪表盘使用，实盘入口的自动落库还需要继续打通。
+- 项目目前主要围绕单标的策略展开，多标的组合、交易所撮合延迟、订单簿深度、真实交易费用和断路器等细节尚未完整建模。
 
 ## 架构总览
 
-整体架构围绕一个中心化的数据层展开，既服务回测又支持实盘。以下流程图展示了各模块之间的交互关系：
-
 ```mermaid
 flowchart LR
-    subgraph Core_Services["核心服务"]
-        direction LR
-        DB_Handler[DBHandler]
-        Database[(TimescaleDB)]
-        DB_Handler -- "管理" --> Database
-    end
+    Config[config.yml 和 .env] --> CLI[intraday CLI]
+    CLI --> Backtest[回测与参数优化]
+    CLI --> DataJob[数据更新与字段回补]
+    CLI --> Live[纸上交易引擎]
+    CLI --> Report[日报与仪表盘]
 
-    subgraph Live_Trading["实时交易系统 (run-live)"]
-        direction TB
-        ETS[EnhancedTradingSystem]
-        Broker[BrokerAPIHandler]
-        Strat[Trading Strategy]
+    DataJob --> Alpaca[Alpaca API]
+    Live --> Alpaca
+    Alpaca --> DataLayer[DBHandler]
+    Backtest --> DataLayer
+    DataLayer --> Storage[(SQLite / Parquet / PostgreSQL / TimescaleDB)]
 
-        ETS -- "下单" --> Broker
-        Broker -- "推送行情" --> ETS
-        ETS -- "获取信号" --> Strat
-    end
-
-    subgraph Backtest_and_Analytics["回测与分析"]
-        direction TB
-        BacktestScript[intraday backtest]
-        ReportScript[run-generate-report]
-        DashboardScript[run-dashboard]
-        Data_Utils[data_utils.py]
-
-        BacktestScript -- "调用" --> Data_Utils
-        Data_Utils -- "提供数据" --> BacktestScript
-    end
-
-    subgraph Automation["自动化 (可选工作流)"]
-        direction TB
-        Cron_Data[每日数据更新]
-        Cron_Backtest[每周回测]
-
-        Cron_Data --> Live_Trading
-        Cron_Backtest --> Backtest_and_Analytics
-    end
-
-    Live_Trading -- "记录交易与指标" --> DB_Handler
-    Backtest_and_Analytics -- "查询历史数据" --> DB_Handler
-    ReportScript -- "拉取数据" --> DB_Handler
-    DashboardScript -- "可视化数据" --> DB_Handler
-
-    classDef core fill:#f9f,stroke:#333,stroke-width:1px;
-    classDef db fill:#cde,stroke:#333,stroke-width:2px;
-    classDef automation fill:#ffc,stroke:#333,stroke-width:1px;
-    class ETS,Broker,Strat,BacktestScript,ReportScript,DashboardScript,Data_Utils core;
-    class DB_Handler,Database db;
-    class Cron_Data,Cron_Backtest automation;
+    Backtest --> Strategies[策略注册表]
+    Live --> LiveStrategy[实时均值回归策略]
+    Live --> Risk[RiskManager]
+    Live --> Validator[ConsistencyValidator]
+    Report --> Analyzer[PerformanceAnalyzer]
+    Report --> Storage
 ```
 
 ## 快速开始
 
-你可以选择使用 Docker（可选，用于可复现/部署）或本地 Python 环境来运行项目。下面分别介绍两种方式的具体步骤，同时提供 `Makefile` 快捷命令。
+### 环境要求
 
-### 方式一：Docker（按需，可复现/部署用）
+- Python 版本应为 3.10。`pyproject.toml` 明确限制为 `>=3.10,<3.11`。
+- 推荐使用 `uv` 管理环境，也可以用标准库 `venv` 加 `pip`。
+- 使用 Alpaca 相关命令前，需要准备 `APCA_API_KEY_ID`、`APCA_API_SECRET_KEY` 和 `ALPACA_BASE_URL`。
 
-1. 克隆仓库
-
-    ```bash
-    git clone https://github.com/runchengxie/intraday-trader-air.git
-    cd intraday-trader-air
-    ```
-
-2. 创建环境变量文件
-
-    ```bash
-    cp .env.example .env
-    ```
-
-    如果需要 TimescaleDB，请额外在 `.env` 中定义 `POSTGRES_PASSWORD`，并确保密钥不会提交到版本库。
-
-3. 启动服务
-
-    ```bash
-    # 等价命令：make docker-live
-    docker compose --profile live up trading-bot
-    ```
-
-    `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
-    Docker Compose 会自动将数据库连接字段（`DB_BACKEND=postgresql` 以及 `DB_HOST/PORT/USER/PASSWORD/NAME`）注入交易容器，对应的 `config.yml` 会读取这些环境变量完成 TimescaleDB 对接。
-
-### 方式二：本地 Python 环境
-
-1. 创建虚拟环境
-
-    ```bash
-    # 推荐使用 uv
-    uv venv
-    source .venv/bin/activate
-
-    # 或使用标准库 venv
-    # python -m venv .venv
-    # source .venv/bin/activate
-    ```
-
-2. 安装依赖并注册 CLI 命令
-
-    ```bash
-    uv sync
-    uv pip install -e .
-    ```
-
-    `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。默认情况下 `uv` 会忽略当前 shell 已激活的其他虚拟环境并使用项目根目录下的 `.venv`；若确实希望复用已激活环境，可在命令后加上 `--active`。
-
-3. 配置凭证
-
-    将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
-
-    ```bash
-    export APCA_API_KEY_ID="你的 Key"
-    export APCA_API_SECRET_KEY="你的 Secret"
-    export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
-    ```
-
-4. 运行命令行工具
-
-    * 更新行情数据：`intraday update-data`
-
-    * 回补缺失行情字段：`intraday data backfill --fields trade_count,vwap`
-
-    * 回测策略：`intraday backtest run`
-
-    * 参数优化：`intraday backtest optimise`
-
-    * 基准对比：`intraday backtest benchmark`
-
-    * 生成报表：`intraday generate-report`
-
-    * 启动纸上交易：`intraday live`
-
-    * 启动仪表盘：`intraday dashboard`
-
-   #### 回测/优化常用参数
-
-   * 默认情况下，`run-backtest` 会先运行买入持有基准，再依次执行配置文件中的全部策略。如果希望只测试部分策略，可多次传入 `--strategy`：
-
-    ```bash
-    # 在不指定选项的时候将同时完成三个策略和 benchmark 的回测
-    run-backtest
-
-    # 只运行 ema_crossover 策略
-    run-backtest --strategy ema_crossover
-
-    # 只运行 mean_reversion 策略
-    run-backtest --strategy mean_reversion
-
-    # 只运行 custom_ratio 策略
-    run-backtest --strategy custom_ratio
-
-    # 指定同时跑多个策略的回测
-    run-backtest --strategy ema_crossover --strategy mean_reversion
-    ```
-
-* 若只想生成买入持有序列，可使用 `run-backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
-
-    ```bash
-     run-backtest --no-benchmark
-    ```
-
-* 若希望回测阶段严格要求 `trade_count` 与 `vwap` 均来自数据库缓存，可在 `config.yml` 的 `data.require_full_fields` 字段设置为 `true`。若验证失败，CLI 会提示先执行 `run-backfill` 以补齐历史缺失列。
-
-* `run-backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
-
-* 回测、优化和数据更新命令会将日志写入 `output/logs`，图表输出至 `output/charts`（可在 `config.yml` 的 `paths` 段自定义）。
-
-    若需仪表盘，安装时请带上 `dashboard` 可选依赖：
-
-    ```bash
-    uv pip install -e '.[dashboard]'
-    # 或
-    pip install -e '.[dashboard]'
-    ```
-
-### 常用 Make 命令
+### 本地安装
 
 ```bash
-make help                # 查看所有常用命令
-make sync                # 安装/同步依赖（默认使用项目内 .venv）
-make backtest ARGS='…'   # 本地回测，可通过 ARGS 透传 --strategy 等参数
-make optimise ARGS='…'   # 仅对选定策略执行参数搜索
-make benchmark           # 单独生成买入持有基准
-make update              # 更新数据缓存
-make fmt                 # 使用 Ruff Formatter 自动格式化
-make coverage            # 运行 pytest 并输出覆盖率
-make docker-live         # 容器模式启动交易服务 + DB
-make docker-db           # 仅启动 TimescaleDB（容器）
+uv venv
+source .venv/bin/activate
+uv sync
+uv pip install -e .
 ```
 
-如需使用当前已激活的虚拟环境运行 `make` 目标，可附加 `USE_ACTIVE=1`：`make backtest USE_ACTIVE=1`。
+如果只安装运行时依赖，可以使用：
 
-## CLI 命令手册
+```bash
+UV_NO_DEV=1 uv sync --frozen
+uv pip install -e .
+```
 
-| 命令 | 目标 | 关键操作 | 主要产出 |
-| --- | --- | --- | --- |
-| `update-data` | 获取最新行情并写入缓存/数据库 | 读取 `.env` 中的 Alpaca 密钥，调用 `fetch_historical_data` 并通过 `DBHandler` 写入 TimescaleDB/SQLite | `output/cache/` 下的 Parquet/SQLite 刷新；数据库 K 线数据 |
-| `backtest run` | 运行单次回测 | 初始化日志目录、载入策略，生成图表/日志并可写入数据库 | `output/logs/trading_log_*.log`、`output/charts/*.png`、控制台指标汇总 |
-| `backtest optimise` | 执行参数优化 | 结合 `strategies.*.opt_ranges` 并行搜索参数组合，输出前十结果 | 控制台排名输出、日志记录 |
-| `backtest benchmark` | 仅运行基准 | 运行配置中的基准策略，可选计算含分红总回报 | 基准指标与图表 |
-| `generate-report` | 汇总交易日志与绩效快照生成日报 | 从数据库提取 24 小时交易与绩效数据，调用 `PerformanceAnalyzer` 输出报告 | `output/daily_report_YYYYMMDD.json` |
-| `live` | 启动纸上交易执行引擎 | 初始化 `EnhancedTradingSystem`、订阅 Alpaca WebSocket、前置风险检查、异步处理订单 | `output/logs/` 中的实时日志、数据库中的交易/绩效快照 |
-| `dashboard` | 启动 Streamlit 仪表盘 | 调用 `streamlit run dashboard_app.py` 并监听本地端口 | Web UI（默认 <http://localhost:8501）> |
+`uv` 默认会使用项目目录下的 `.venv`。需要复用当前 shell 已激活的环境时，可以给 `uv` 命令加 `--active`。
 
-### 命令详解
+### 配置密钥
 
-* update-data：脚本会先加载 `.env`，然后根据 `config.yml` 中的 `data.ticker` 与时间范围决定拉取的标的与窗口，支持向缓存目录写入 Parquet 文件并通过 `DBHandler.initialize_db()` 创建所需表结构。
+```bash
+cp .env.example .env
+```
 
-* backtest run：除策略回测外，会根据 `config.yml.paths` 自动创建日志、图表、缓存目录，并把运行日志写入 `output/logs/trading_log_*.log`。若配置基准并启用 `benchmark.total_return`，会自动汇总股息到总回报指标。
+然后在 `.env` 中填写 Alpaca 密钥。若使用 Docker Compose 的数据库服务，还需要填写 `POSTGRES_PASSWORD`。
 
-* backtest optimise：尊重 `backtest.max_cpus` 并行执行参数搜索，输出 `Final Value`、`Sharpe Ratio` 等指标的前十名列表。
+```bash
+APCA_API_KEY_ID=replace-with-your-apca-api-key-id
+APCA_API_SECRET_KEY=replace-with-your-apca-api-secret-key
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+POSTGRES_PASSWORD=replace-with-a-strong-local-password
+```
 
-* backtest benchmark：只运行基准策略，适合在 CI 中做快速健诊，也可以单独查看含分红/不含分红的收益差异。
+### 常用命令
 
-* generate-report：默认取最近 24 小时的交易与绩效快照，借助 `PerformanceAnalyzer.generate_performance_report()` 生成 JSON 文档，便于上游任务继续处理或推送。
+```bash
+intraday update-data
+intraday data backfill --fields trade_count,vwap
+intraday backtest run
+intraday backtest run --strategy ema_crossover
+intraday backtest run --strategy mean_reversion --strategy custom_ratio
+intraday backtest run --no-benchmark
+intraday backtest optimise
+intraday backtest optimize
+intraday backtest benchmark
+intraday generate-report
+intraday live
+intraday dashboard
+```
 
-* live：`EnhancedTradingSystem` 内部组合了 `RiskManager`、`PerformanceAnalyzer`、`ConsistencyValidator` 与 `BrokerAPIHandler`，所有订单在入队前都会通过风险检查；同时支持 `no_fill_test_mode` 进行“不会成交”的联调演练。
+`optimise` 和 `optimize` 都可以使用，二者指向同一个参数优化入口。旧脚本入口仍然保留，例如 `run-backtest`、`run-live`、`run-update-data`、`run-generate-report` 和 `run-dashboard`。新文档统一推荐使用 `intraday` 顶层命令。
 
-* dashboard：如果仓库安装了 `dashboard` 可选依赖，会启动 Streamlit 应用，实时展示数据库中的账户表现与风险指标。
+### Docker 运行
 
-## 配置、环境与密钥管理
+```bash
+cp .env.example .env
+# 填写 .env 中的 Alpaca 密钥和 POSTGRES_PASSWORD
 
-* `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `UV_NO_DEV=1` 禁用开发依赖。
+docker compose --profile live up trading-bot
+```
 
-* `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。数据库段默认回落到本地 SQLite，当注入 `DB_BACKEND=postgresql` 时则使用 `DB_HOST/PORT/USER/PASSWORD/NAME` 与 TimescaleDB 建立连接。
+只启动数据库：
 
-* Docker 场景：`docker-compose.yml` 会把主机的环境变量透传给交易容器，并通过卷挂载持久化输出目录；TimescaleDB 密码同样从 `.env` 自动注入。
+```bash
+docker compose --profile db up db
+```
 
-* 安全提醒：永远不要把密钥写入版本库，可将 `.env`、`.envrc` 保持在本地，同时利用 `.dockerignore` 避免构建镜像时打包敏感文件。
+停止服务可以使用 `CTRL+C`，清理容器与网络可以使用：
 
-## 风控参数与执行流程
+```bash
+docker compose down
+```
 
-`config.yml` 的 `live_trading.risk_limits` 定义了下单前的硬约束，`RiskManager` 会在行情更新与订单评估时逐项验证：
+## Makefile 快捷命令
+
+```bash
+make help
+make sync
+make backtest ARGS='--strategy ema_crossover'
+make optimise ARGS='--strategy mean_reversion'
+make benchmark
+make update
+make live
+make dashboard
+make lint
+make fmt
+make coverage
+make docker-build
+make docker-live
+make docker-db
+```
+
+如需使用当前已激活的虚拟环境运行 `make` 目标，可以追加 `USE_ACTIVE=1`：
+
+```bash
+make backtest USE_ACTIVE=1 ARGS='--strategy ema_crossover'
+```
+
+## CLI 命令说明
+
+| 命令 | 用途 | 主要产出 |
+| --- | --- | --- |
+| `intraday update-data` | 拉取配置标的前一日分钟线，写入缓存和数据库，并运行数据质量检查。 | `output/cache/`、`output/data_qc_*.json`、数据库行情表 |
+| `intraday data backfill` | 按配置日期范围或命令行参数，回补 `trade_count`、`vwap` 等行情字段。 | 更新后的 `market_data` |
+| `intraday backtest run` | 运行买入持有基准和选定策略的单次回测。 | 控制台指标、`output/logs/`、`output/charts/` |
+| `intraday backtest optimise` | 按 `opt_ranges` 搜索策略参数。 | 控制台前十名参数组合和日志 |
+| `intraday backtest benchmark` | 只运行配置中的买入持有基准。 | 基准指标和图表 |
+| `intraday generate-report` | 汇总最近 24 小时的交易日志和绩效快照。 | `output/daily_report_YYYYMMDD.json` |
+| `intraday live` | 启动 Alpaca 纸上交易事件循环。 | 实时日志和订单状态处理 |
+| `intraday dashboard` | 启动 Streamlit 仪表盘。 | 默认本地 Web 页面：<http://localhost:8501> |
+
+## 配置文件要点
+
+`config.yml` 是主要配置入口：
+
+- `alpaca`：从环境变量读取 API 密钥和接口地址。
+- `data`：设置标的、回测时间范围、K 线周期、复权方式和字段完整性要求。
+- `paths`：设置输出、日志、图表和缓存目录。
+- `benchmark`：设置买入持有基准和股息总回报开关。
+- `database`：设置 `sqlite`、`parquet` 或 `postgresql` 后端。
+- `backtest`：设置初始资金、佣金、滑点和最大 CPU 数。
+- `strategies`：设置策略类、参数、优化网格和订单参数。
+- `live_trading`：设置纸上交易标的、初始资金、no-fill 测试和风控阈值。
+- `logging`：设置日志等级、格式和时间格式。
+
+环境变量支持 `${ENV_VAR:-default}` 形式。通用配置加载器 `intraday_trader_air.configuration.load_app_config()` 已支持默认值替换。需要注意，`run_live_trading.py` 内部还有一个旧版 YAML 加载函数，默认值替换能力较弱，后续最好统一到通用配置加载器。
+
+## 风控参数
+
+`config.yml` 的 `live_trading.risk_limits` 定义下单前的限制：
 
 | 参数 | 含义 | 默认值 |
 | --- | --- | --- |
-| `max_order_participation_ratio` | 单笔委托不得超过近期成交量的比例，防止过度冲击市场 | 0.02 |
-| `max_bid_ask_spread_pct` | 可接受的最大点差百分比，避免在流动性极低时入场 | 0.005 |
-| `market_impact_coefficient` | 冲击成本模型系数，用于估计成交滑点 | 0.5 |
-| `max_gross_exposure` | 多空绝对敞口占净值的上限 | 1.5 |
-| `max_leverage` | 总资产 / 净资产的最大杠杆倍数 | 2.0 |
-| `max_var` / `max_concentration` / `min_liquidity` | VaR、单标的集中度与最小流动性门槛 | 0.05 / 0.3 / 1,000,000 |
+| `max_order_participation_ratio` | 单笔订单占近期成交量的上限。 | 0.02 |
+| `max_bid_ask_spread_pct` | 可接受的最大买卖价差比例。 | 0.005 |
+| `market_impact_coefficient` | 估算市场冲击成本的系数。 | 0.5 |
+| `max_gross_exposure` | 多空绝对敞口相对净值的上限。 | 1.5 |
+| `max_leverage` | 总资产相对净资产的最大倍数。 | 2.0 |
+| `max_var` | VaR 上限。 | 0.05 |
+| `max_concentration` | 单标的集中度上限。 | 0.3 |
+| `min_liquidity` | 最低流动性门槛。 | 1,000,000 |
 
-风控流程简述：行情经 `RiskManager.update_market_data()` 累积历史窗口 → `_perform_risk_checks` 检测价格跳变、量能突增、流动性不足 → 下单前调用 `check_liquidity_and_impact()`、`check_leverage_and_exposure()` 等函数，若超限则返回告警并阻止订单入队。
+基本流程：行情进入 `RiskManager.update_market_data()` 后，系统会检查价格跳变、成交量异常和流动性风险。下单前再调用 `check_liquidity_and_impact()` 与 `check_leverage_and_exposure()`，超限时阻止订单继续执行。
 
-## 实盘运行与组件职责
+## 测试
 
-`run_live_trading.py` 中的 `EnhancedTradingSystem` 以异步队列为中心组织事件流：
+完整测试环境应先执行：
 
-* 数据通路：`BrokerAPIHandler` 订阅行情与订单状态，通过 `asyncio.Queue` 推给策略与风控组件；断线自动重连，并在更新时记录详细日志。
+```bash
+uv sync
+uv pip install -e .
+```
 
-* 风险管理：`RiskManager` 在订单生成前执行流动性、敞口、VaR 等校验；`ConsistencyValidator` 负责检查状态一致性与异常回调。
+常用测试命令：
 
-* 绩效追踪：`PerformanceAnalyzer` 按分钟写入投资组合快照，可配合 `DBHandler.log_performance_snapshot()` 存档，供日报与仪表盘读取。
+```bash
+uv run pytest
+uv run pytest -m 'not integration'
+uv run pytest -m integration
+make coverage
+```
 
-* 联调模式：`no_fill_test_mode` 允许注入永不成交的测试单（通过价格偏移和自动撤单），用于验证消息流与风控逻辑。
+测试目录结构：
 
-## 自动化调度（可选模板）
+- `tests/unit/`：配置、数据质量、存储、风控、绩效分析、策略和实盘组件的单元测试。
+- `tests/integration/`：Alpaca 与数据库集成测试，需要外部服务或凭证。
+- `tests/e2e/`：回测工作流端到端测试。
+- `tests/conftest.py`：公共 fixture，包括临时输出目录、配置对象、Alpaca stub 和轻量版 `mocker`。
 
-仓库未直接附带 GitHub Actions Workflow 文件，但 CLI 已适配批处理场景。你可以基于下表快速创建调度脚本或 Actions 工作流：
+当前测试脚本已经使用 `pytest.importorskip` 跳过缺失依赖的部分用例。集成测试还会检查 Alpaca 凭证。若在非 Python 3.10 或未安装依赖的环境中直接运行，测试结果只能说明当前环境不完整，不能代表项目本身的完整测试状态。
 
-| 任务 | 推荐频率 | 命令 | 备注 |
-| --- | --- | --- | --- |
-| 行情更新 | 每日开盘前 | `intraday update-data` | 需要 Alpaca API 密钥与数据库连接 |
-| 回测回归 | 每周或策略改动时 | `intraday backtest run` / `intraday backtest optimise` | 可结合参数优化输出对比图表 |
-| 日报生成 | 每日收盘后 | `intraday generate-report` | 产出 JSON，可再由 CI 推送到 S3/钉钉等 |
+## 文档索引
 
-若在 GitHub Actions 部署，请记得在仓库 Secrets 中配置 Alpaca 凭证与数据库密码。
-
-## Roadmap / 已知局限
-
-* 成交模型待加强：当前冲击成本为静态系数，后续计划引入基于订单簿深度的动态模型。
-
-* 执行算法有限：实盘仅提供均值回归策略，后续会补充 VWAP/TWAP 等算法。
-
-* 回测逼真度：仍待模拟交易所费用、断路器、撮合延迟等细节；当前版本已支持基准含分红收益与 `max_cpus` 自适应，但真实成交建模仍有提升空间。
-
-* 策略扩展：虽有策略注册表，但缺少模板与文档指导多标的、多频率策略的接入。
-
-* 回放测试：目前无历史行情回放的集成测试场景，建议未来补充。
+| 文件 | 内容 |
+| --- | --- |
+| `AGENTS.md` | 仓库协作、测试、代码风格和文档书写约定。 |
+| `docs/current_project_overview.md` | 当前代码能力、测试覆盖和已知技术债说明。 |
+| `docs/project_requirements.md` | 课程中算法交易题目的中文整理。 |
+| `docs/additional_guide.md` | 均值回归、趋势跟随、风险评估和因子分析的补充笔记。 |
+| `docs/general_requirements.md` | 课程项目通用要求的中文整理。 |
+| `docs/general_requirements_2.md` | 课程简报要求的中文整理。 |
+| `docs/exam_guidelines.md` | 课程考试说明归档。 |
 
 ## 项目结构
 
 ```tree
 .
-├── src/intraday_trader_air/   # 核心代码（策略、数据、风险、实盘引擎）
-│   └── strategies/               # 策略包（含基类、注册表与具体策略实现）
-├── tests/                        # 单元测试与集成测试
-├── docs/                         # 文档与设计说明
-├── project_tools/                # 开发工具与辅助脚本
-├── Makefile                      # 本地与 Docker 工作流统一入口
-├── config.yml                    # 全局配置（策略参数、数据源、数据库）
-├── docker-compose.yml            # Docker 编排配置
-├── Dockerfile                    # 多阶段构建产物镜像
-└── pyproject.toml                # 项目依赖与打包信息
+├── src/intraday_trader_air/      # 核心代码
+│   ├── backtest/                 # 回测请求对象与执行入口
+│   ├── scripts/                  # CLI 子命令实现
+│   └── strategies/               # 策略基类、注册表和内置策略
+├── tests/                        # 单元测试、集成测试和端到端测试
+├── docs/                         # 当前说明文档与课程资料归档
+├── project_tools/                # 开发辅助脚本
+├── Makefile                      # 本地和 Docker 常用任务
+├── config.yml                    # 全局配置
+├── docker-compose.yml            # Docker Compose 服务定义
+├── Dockerfile                    # 多阶段镜像构建
+└── pyproject.toml                # 依赖、打包和工具配置
 ```
 
-## 常见问题（FAQ）
+## 常见问题
 
-1. 一定要用 TimescaleDB 吗？ 不需要。默认使用 SQLite/Parquet 缓存，等需要更长历史或多标的并发查询时，再切换到 TimescaleDB 即可。
+1. 一定要用 TimescaleDB 吗？
 
-2. Alpaca 账号必须是真实资金吗？ 不需要。推荐使用 Alpaca Paper Trading（模拟账户）完成联调。
+   不需要。默认配置使用 SQLite，本地快速试验足够。需要更长历史、多进程读写或团队共享时，再切换到 PostgreSQL/TimescaleDB。
 
-3. Docker 是必须的吗？ 不是。Docker 仅提供可复现环境，本地虚拟环境照样可以直接运行脚本。
+2. Alpaca 账号必须绑定真实资金吗？
 
-4. 如何扩展新策略？ 在 `src/intraday_trader_air/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
+   不需要。推荐先使用 Alpaca Paper Trading 完成策略、风控和订单状态联调。
 
-5. 如何切换数据存储后端？ 编辑 `config.yml` 的 `database` 配置块即可。示例：
+3. Docker 是强制要求吗？
 
-    * 使用 SQLite：保持默认 `backend: sqlite` 与 `path: output/trading.db`
+   不强制。Docker 负责提供可复现运行环境，本地虚拟环境也可以运行同一套 CLI。
 
-    * 使用 Parquet：设置 `backend: parquet` 并调整 `path`
+4. 如何扩展新策略？
 
-    * 使用 TimescaleDB/PostgreSQL：设置 `backend: postgresql`，并通过环境变量或直接在配置中补充 `host/port/user/password/dbname`
+   在 `src/intraday_trader_air/strategies/` 中新增策略类，把类加入 `REGISTRY`，再在 `config.yml` 的 `strategies` 段配置参数和优化网格。
+
+5. 如何切换数据存储后端？
+
+   修改 `config.yml` 的 `database.backend`。可选值为 `sqlite`、`parquet` 和 `postgresql`。使用 PostgreSQL 时，需要同时提供 `host`、`port`、`user`、`password` 和 `dbname`。

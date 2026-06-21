@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import sys
 from collections.abc import Callable, Sequence
 
 _BACKTEST_COMMANDS = {
@@ -23,6 +24,9 @@ _SIMPLE_COMMANDS = {
 _DATA_COMMANDS = {
     "backfill": "intraday_trader_air.scripts.run_backfill_data:main",
 }
+
+
+_MIN_ARGS = 2
 
 
 class CommandNotFoundError(RuntimeError):
@@ -55,15 +59,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     backtest_subparsers = backtest_parser.add_subparsers(dest="backtest_command")
 
-    for name, target in _BACKTEST_COMMANDS.items():
-        sub = backtest_subparsers.add_parser(name, add_help=False)
-        sub.add_argument("args", nargs=argparse.REMAINDER)
-        sub.set_defaults(target=target)
+    for name in _BACKTEST_COMMANDS:
+        backtest_subparsers.add_parser(name, add_help=False)
 
-    for name, target in _SIMPLE_COMMANDS.items():
-        simple = subparsers.add_parser(name, add_help=False)
-        simple.add_argument("args", nargs=argparse.REMAINDER)
-        simple.set_defaults(target=target)
+    for name in _SIMPLE_COMMANDS:
+        subparsers.add_parser(name, add_help=False)
 
     data_parser = subparsers.add_parser(
         "data",
@@ -71,26 +71,79 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     data_subparsers = data_parser.add_subparsers(dest="data_command")
 
-    for name, target in _DATA_COMMANDS.items():
-        sub = data_subparsers.add_parser(name, add_help=False)
-        sub.add_argument("args", nargs=argparse.REMAINDER)
-        sub.set_defaults(target=target)
+    for name in _DATA_COMMANDS:
+        data_subparsers.add_parser(name, add_help=False)
 
     return parser
 
 
+def _available(mapping: dict[str, str]) -> str:
+    return ", ".join(sorted(mapping))
+
+
+def _resolve_command(argv: Sequence[str]) -> tuple[str, list[str]]:
+    """Resolve the top-level command and preserve all child command options."""
+
+    if not argv:
+        raise CommandNotFoundError("missing command")
+
+    command = argv[0]
+
+    if command == "backtest":
+        if len(argv) < _MIN_ARGS:
+            raise CommandNotFoundError(
+                f"missing backtest command. "
+                f"Available: {_available(_BACKTEST_COMMANDS)}"
+            )
+        subcommand = argv[1]
+        target = _BACKTEST_COMMANDS.get(subcommand)
+        if target is None:
+            raise CommandNotFoundError(
+                f"unknown backtest command '{subcommand}'. "
+                f"Available: {_available(_BACKTEST_COMMANDS)}"
+            )
+        return target, list(argv[2:])
+
+    if command == "data":
+        if len(argv) < _MIN_ARGS:
+            raise CommandNotFoundError(
+                f"missing data command. "
+                f"Available: {_available(_DATA_COMMANDS)}"
+            )
+        subcommand = argv[1]
+        target = _DATA_COMMANDS.get(subcommand)
+        if target is None:
+            raise CommandNotFoundError(
+                f"unknown data command '{subcommand}'. "
+                f"Available: {_available(_DATA_COMMANDS)}"
+            )
+        return target, list(argv[2:])
+
+    target = _SIMPLE_COMMANDS.get(command)
+    if target is not None:
+        return target, list(argv[1:])
+
+    raise CommandNotFoundError(
+        f"unknown command '{command}'. Available: "
+        f"backtest, data, {_available(_SIMPLE_COMMANDS)}"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
-    parsed = parser.parse_args(argv)
+    args = list(sys.argv[1:] if argv is None else argv)
 
-    target_path = getattr(parsed, "target", None)
-    if target_path is None:
+    if not args or args[0] in {"-h", "--help"}:
         parser.print_help()
         return 0
 
+    try:
+        target_path, forwarded_args = _resolve_command(args)
+    except CommandNotFoundError as exc:
+        parser.error(str(exc))
+
     target = _load_callable(target_path)
-    args = getattr(parsed, "args", [])
-    result = target(args)
+    result = target(forwarded_args)
     return 0 if result is None else int(result)
 
 

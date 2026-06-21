@@ -1,96 +1,64 @@
-# CQF FINAL PROJECTS
+# CQF 最终项目通用要求归档
 
-> **课堂参考**：本文档来源于课堂作业，仅作参考；实际项目流程与贡献指南以仓库 README 为准。
+> 课程资料归档：本文整理自课程项目通用要求。当前仓库的实际运行方式、测试方式和贡献流程以 `README.md` 与 `AGENTS.md` 为准。
 
-*by Dr Richard Diamond, PhD CQF ARPM*
+## 准备工作
 
-## Preparation
+课程建议先阅读最终项目 brief、关键阅读材料和补充文件，再收集所需数据。数据来源应与题目匹配，例如股票数据可以使用公开行情源，也可以在合理假设下生成合成数据。
 
-* Start with FP brief, Key Readings and collecting necessary data.
-  * *Additional Material*
-  * Use data sources named for each topic, e.g., yfinance for equities data.
-  * Make reasonable assumptions and generate synthetic data. It is up to you to source data and decide on features based on guidance provided.
-    * *spreads, rates, IVs.*
-  * Topic CR, assume hypothetical CDS spreads and compute Corr from equity returns.
-    * *TDS Web.*
+开始写代码前，应先规划研究设计：
 
-* Plan your own course of implementation/study design. Make simple flowcharts and lists.
-  * Refer to CQF Lectures. On DL/ML/DN topics in particular do extra reading on methods.
+- 明确研究问题。
+- 画出简短流程图。
+- 列出需要实现的模型和数值方法。
+- 说明数据来源、特征和关键假设。
+- 对深度学习、机器学习或高维 PDE 题目补充阅读方法论文。
 
-## Code Adoption
+## 代码使用原则
 
-A. You can adopt code for specific tasks, but not to submit a scripted coded solution or slightly changed CQF Python Lab code. Amend code for your purpose, not copy/paste.
+课程允许参考已有代码完成特定任务，但不允许直接提交课堂实验代码或只做轻微修改。可以复用成熟库，也可以从原理实现关键方法。判断标准是：核心模型、关键数值技术和研究结论必须能解释清楚。
 
-B. Where pricing or techniques maths is given – that signals to implement from the first principles. Where computation is overly elaborate: quant judgement to use ready libraries. Typically is where optimisation involved.
+适合自己实现的内容：
 
-* *RNN or Convolution CNN-LSTM*
+- 定价公式。
+- Black-Litterman 公式。
+- SDE Monte Carlo 离散格式。
+- 矩阵形式回归。
+- Engle-Granger 检验流程。
+- 插值、Cholesky 分解、t-copula 公式。
+- CDS bootstrap。
+- 特征计算。
 
-C. Welcome to implement complex numerical methods vs. use of ready solution – if able to.
+适合使用成熟库的内容：
 
-* *Num methods in DL are about not over training hyperparams for CNN*
+- 大多数深度学习训练流程。
+- 神经网络参数优化。
+- 多变量协整工具。
+- 核密度估计。
+- 工业级数据处理和可视化工具。
 
-## Numerical Techniques
+## 报告结构
 
-Implement as necessary, numerical techniques from the first principles.
+建议报告包含：
 
-**What to code:** pricing formulae, Black-Litterman formulae, SDE Monte-Carlo schemes, matrix form regression, Engle-Granger, interpolation, Cholesky, t-copula formula, CDS bootstrap, features computation...
+1. 引言：问题定义、研究设计、主要数据和数值技术表。
+2. 模型与方法：数学模型、数值方法、收敛性、精度和计算性质。
+3. 结果与分析：图表、指标、稳健性和敏感性分析。
+4. 结论：模型优缺点、实现限制和改进方向。
 
-**Use ready solutions for:** most of deep learning/classification tasks (eg, don't recode optimisation search for NN coefficients!), low latency RNs, kernel density (obtaining CDF), multivariate cointegration...
+报告不能只堆代码、表格和截图。每个图表都应解释它说明了什么，以及它对结论有什么影响。
 
-* *but correct layering in CNN-LSTM (example)*
+## 运行与复现
 
-* *RNN limitations in regard to time series sequences.*
+代码应模块化、可复现、可测试。若运行方式比较特殊，超出常见 Python、R 或 C++ 流程，需要写清楚安装、配置和执行命令。注释应解释关键逻辑，不需要逐行解释每个变量。
 
-## Project Report
+## 提交要求归档
 
-* **(Ch 1)** Introduction with problem statement, describing design, main data and a coded numerical techniques table.
+原课程要求通常包括：
 
-* **(Ch 2)** As full as possible mathematical description of the models employed as well as numerical methods. Remember accuracy and convergence!
+- 一份最终报告文件。
+- 一份包含代码、声明和辅助文件的压缩包。
+- 文件名应包含项目代码和注册姓名。
+- 不应提交零散脚本文件或泛泛命名的压缩包。
 
-  * *vs. ChX at end, discussing - hyperparam search, Kernel tricks - accuracy, F1scores, epochs / EP.*
-
-* **(Ch 3-4 Results | Analysis)** Present results presented using a plenty of tables and figures, which must be interpreted not just thrown at the reader.
-
-* **(Ch 5 Conclusions)** Pros and cons of a model and its implementation, together with possible improvements.
-
-  * *"say what you have said"*
-
-## Project Report (cont)
-
-* Demonstrate 'the specials' of your implementation: own research, own coding of complex methods, use of the industrial-strength libraries of C++, Python.
-
-* Instructions on how to compile/run, if not common Python/R. The code must be thoroughly tested and well-documented, however no need to over-comment the code.
-
-> *Design can be "with code", stemming from IPYNB format*
-> *But can be .py or .R or .cpp files as project + report.*
-> *No need to code-annotate each line, each variable.*
-
-## The Offering
-
-* We will have a look at Topics in the main Project Brief.
-
-* **Main Sources:** FP Brief, FP Workshop slides and Additional Files, FP Tutorials and distributed material.
-
-* Electives come secondary, one exception is Topic AL Algo Trading. Electives can be watched at the stage of Analysis & Discussion write up.
-
-## Submission Instructions
-
-*Please follow:*
-
-**FILE 1.** It's **absolutely necessary** to name and upload the project report as **ONE file** (pdf or html) with the two-letter project code, followed by your name as **registered** on CQF Portal.
-
-* Examples: `TS_John Smith_REPORT.pdf` or `PC_Xiao Wang_REPORT.pdf`
-
-* *(Note: `Nbconvert` is written, likely referring to a tool for converting notebooks to other formats).*
-
-**FILE 2.** All other files, code and a pdf declaration (if not the front page) have to be uploaded as additional **ONE zip file**, for example `TS_John Smith_CODE.zip`.
-
-* No unzipped `.py`, `.cpp` files. No files with generic names, e.g. `CODE.zip`, `FinalProject.zip`.
-
-## Final Day
-
-**Final Day as FP Brief.**
-
-Don't Extend Your Luck!
-
-> *There is no standard "extension 2 weeks"*
+这些提交规则只适用于课程平台。当前仓库的贡献方式以 PR、测试结果和代码评审为准。

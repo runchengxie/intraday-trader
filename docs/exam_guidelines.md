@@ -1,67 +1,38 @@
-# January 2025 - Final Project
+# 2025 年 1 月最终项目考试说明归档
 
-> **课堂参考**：以下内容保留原课程作业的考试说明，仅作为历史背景供项目参与者参考，并不代表当前仓库的项目规范或贡献要求。
+> 课程资料归档：本文只保留课程考试背景，方便理解本仓库最初的项目来源。当前仓库的开发、测试和提交规范以 `README.md` 与 `AGENTS.md` 为准。
 
-> [!NOTE]
->
-> You are about to start the Certificate in Quantitative Finance (CQF) exam. By accessing the exam materials, you acknowledge and agree to the CQF Terms of Use (<https://www.fitch.group/terms-of-use/> en) and the following terms:
->
-> - Fitch Learning Limited ("Fitch Learning") holds ownership or licenses for all intellectual property rights related to the <www.cqf.com> website and any content available on the website and the exam, including text, graphics, software, photographs, images, videos, sound, trademarks, and logos (the "CQF Materials").
-> - By clicking "Start Assignment," you consent not to infringe upon Fitch Learning's intellectual property rights. You agree not to copy, modify, reproduce, publish, sell, upload, broadcast, post, transmit, license, distribute, adapt, merge, translate, decompile, or reverse engineer any part of the CQF Materials without Fitch Learning's written consent.
-> - Fitch Learning reserves the right to take action against any unauthorized use of the CQF Materials in the event of a breach of these terms. This may include, but is not limited to: (i) disabling and terminating your account; (ii) requesting you to remove materials that breach these terms; and/or (iii) commencing legal proceedings to protect Fitch Learning's or its licensors' intellectual property rights.
+## 考试材料与诚信要求
 
-Please read the following instructions carefully.
+课程说明强调，考试材料受课程平台和版权方条款保护。学生需要遵守平台的使用规则，不得未经许可复制、传播、改写、出售或公开发布考试材料。
 
-**ONLY SUBMIT YOUR FINAL VERSION OF THE EXAM ONTO THE PORTAL ONCE READY.**
+如果需要澄清题目，应通过课程平台的支持渠道提交问题。导师通常不会重新讲解计算过程，也不会确认具体数值答案是否正确。
 
-Clarifying questions should be raised through a support ticket. You can find the "Support" button on your learning portal. Please note, the tutor is unable to re-explain calculation or confirm correct numerical answers or required sections.
+## 提交时间与成绩
 
-[DOWNLOAD JANUARY 2025 FINAL PROJECT BRIEF ⇩](https://www.google.com/search?q=DOWNLOAD+JANUARY+2025+FINAL+PROJECT+BRIEF)
+原课程说明中的关键安排：
 
-[DOWNLOAD JANUARY 2025 FINAL PROJECT DECLARATION ⇩](https://www.google.com/search?q=DOWNLOAD+JANUARY+2025+FINAL+PROJECT+DECLARATION)
+- 项目提交截止时间为 2025 年 8 月 21 日 23：59（英国夏令时）。
+- 项目结果计划于 2025 年 11 月 13 日发布。
+- 通过分数线为 60%。
 
-Submission date for the project is **Thursday 21st August 2025, 23.59 (BST)**. Please note, the project results will be made available **Thursday 13th November 2025**.
+这些日期只对原课程有效，不约束当前代码仓库。
 
-The pass mark for this exam is 60%.
+## 项目题目方向
 
-## How to Submit Your Answer
+课程提供多个项目方向，包括：
 
-Please refer to the [JANUARY 2025 FINAL PROJECT BRIEF ⇩](https://www.google.com/search?q=JANUARY+2025+FINAL+PROJECT+BRIEF) for instructions on how to submit your answer.
+1. 篮子产品信用利差。
+2. 深度学习资产预测。
+3. 配对交易策略设计与回测。
+4. Black-Litterman 与因子组合构建。
+5. 高级数据建模下的最优对冲。
+6. 分类模型的集成学习。
+7. 均值回归与趋势跟随算法交易。
+8. 高维 PDE 的深度神经网络求解。
 
-## Extensions
+本仓库对应第 7 类：均值回归与趋势跟随算法交易。
 
-Absolutely no extensions will be accepted, any delegate who fails to hand in their work will be deferred with no exceptions.
+## 与当前仓库的关系
 
-## Project Options
-
-To complete the project, you must code the model(s) and its numerical techniques from **one** topic from the below options and write an analytical report. If you continue from a previous cohort, please review topic description because tasks are regularly reviewed. It is not possible to submit past topics.
-
-1. **Credit Spread for a Basket Product (CR)**
-
-2. **Deep Learning for Asset Prediction (DL)**
-
-3. **Pairs Trading Strategy Design & Back-test (TS)**
-
-4. **Portfolio Construction using Black-Litterman Model and Factors (PC)**
-
-5. **Optimal Hedging with Advanced Data Modelling (DH)**
-
-6. **Blending Ensemble for Classification (ML)**
-
-7. **Algorithmic Trading for Reversion and Trend-Following (AL)**
-
-8. **Deep Neural Networks for Solving High Dimensional PDEs in Quantitative Finance (DeepPDE) (DN)**
-
-## Supporting Workshop and Tutorial Dates
-
-- **05/07/2025** - Final Project Workshop I (CR, PC & DH) - **13:00–16:30 BST**
-
-- **12/07/2025** - Final Project Workshop II (TS, DL, ML, AL, DN & DH) - **13:00–16:30 BST**
-
-- **21/07/2025** - Final Project Tutorial I (PC & DN Topic) - **18:00–20:00 BST**
-
-- **22/07/2025** - Final Project Tutorial III (DL & ML Topic) - **18:00–19:00 BST**
-
-- **23/07/2025** - Final Project Tutorial IV (TS, DH & AL Topic) - **18:00–19:00 BST**
-
-- **24/07/2025** - Final Project Tutorial I (CR Topic) - **18:00–19:00 BST**
+原考试说明属于课程背景材料，当前仓库已经演化为一个独立的 Python 项目。维护时请按当前项目事实更新文档和测试，不要把课程提交规则当作仓库贡献规则。课程文档保留在 `docs/` 中，用于解释研究背景和需求来源。

@@ -1,21 +1,93 @@
-# Repository Guidelines
+# 仓库协作指南
 
-## Project Structure & Module Organization
-The production package lives in `src/intraday_trader_air/`, with `backtest/`, `strategies/`, and helper modules (`data_utils.py`, `risk_manager.py`, `dashboard_app.py`) forming the trading pipeline. CLI entrypoints reside in `src/intraday_trader_air/scripts/` and surface through the `intraday` command declared in `pyproject.toml`. Tests mirror the package under `tests/unit`, `tests/integration`, and `tests/e2e`; share fixtures in `tests/conftest.py`. Root-level automation files (`Makefile`, `docker-compose.yml`, `Dockerfile`) and `config.yml` drive orchestration, while reference material belongs in `docs/`.
+## 项目结构
 
-## Build, Test, and Development Commands
-- `uv sync && uv pip install -e .` sets up an editable environment with the dev toolchain.
-- `intraday backtest run`, `intraday update-data`, and `intraday live` exercise the core workflows; pair flags like `--config config.yml` when experimenting.
-- `make backtest`, `make lint`, `make fmt`, `make coverage`, and `make docker-live` wrap common tasks; compose profiles ensure TimescaleDB starts before the live bot.
+生产代码位于 `src/intraday_trader_air/`。其中：
 
-## Coding Style & Naming Conventions
-Follow Python 3.10 syntax, four-space indentation, and Ruff’s 88-character line limit. Modules and functions stay `snake_case`, classes use `PascalCase`, and constants remain uppercase. Run `uv run ruff check .` and `uv run ruff format .` before every push; justify any lint suppression in code review notes.
+- `backtest/` 放置回测请求对象与执行入口。
+- `strategies/` 放置策略基类、策略注册表和内置策略。
+- `scripts/` 放置 CLI 子命令实现。
+- `data_utils.py`、`db_handler.py`、`risk_manager.py`、`performance_analyzer.py`、`dashboard_app.py` 等模块组成数据、风控、分析和展示链路。
 
-## Testing Guidelines
-Pytest powers the suite. Use `uv run pytest` for fast smoke coverage and `make coverage` when preparing reports (`--cov=intraday_trader_air`). Apply the existing markers: `pytest -m integration` isolates external service calls, whereas `pytest -m "not integration"` keeps CI focused on unit tests. Name new files after their targets (e.g., `tests/unit/test_risk_manager.py`) and reuse fixtures rather than mocking brokers repeatedly.
+测试位于 `tests/`，分为 `unit`、`integration` 和 `e2e`。公共 fixture 放在 `tests/conftest.py`。根目录的 `Makefile`、`Dockerfile`、`docker-compose.yml` 和 `config.yml` 负责本地任务、镜像构建、服务编排和运行配置。
 
-## Commit & Pull Request Guidelines
-Commits follow a short, present-tense style (`Rename framework to intraday-trader-air`); add a scope prefix when helpful (`strategies: add ema crossover`). Ensure each commit passes lint and unit tests locally. Pull requests should link issues, call out trading-impacting changes, and attach screenshots or CLI excerpts for dashboard or terminal output.
+## 常用开发命令
 
-## Environment & Configuration Tips
-Copy `.env.example` to `.env` for Alpaca keys and database credentials, then keep the file out of version control. Switch storage backends through `config.yml` (`sqlite`, `parquet`, `postgresql`) and document schema migrations when altering tables. For Docker flows, prefer `docker compose --profile live up trading-bot` so the health checks gate the trading service on TimescaleDB readiness.
+```bash
+uv sync
+uv pip install -e .
+intraday backtest run
+intraday backtest run --strategy ema_crossover
+intraday backtest optimise
+intraday data backfill --fields trade_count,vwap
+intraday update-data
+intraday live
+intraday dashboard
+make lint
+make fmt
+make coverage
+make docker-live
+```
+
+项目要求 Python 3.10。`pyproject.toml` 限制为 `>=3.10,<3.11`，不要把 CI 或本地开发环境偷偷升级到 3.11 以上再让错误信息替你写悬疑小说。
+
+## 代码风格
+
+- 使用四空格缩进。
+- 行宽遵守 Ruff 的 88 字符限制。
+- 模块、函数和变量使用 `snake_case`。
+- 类名使用 `PascalCase`。
+- 常量使用大写加下划线。
+- 提交前运行 `uv run ruff check .` 和 `uv run ruff format .`。
+- 如果必须忽略 lint 规则，请在评审说明里解释原因。
+
+## 测试要求
+
+常规测试：
+
+```bash
+uv run pytest
+```
+
+排除外部服务的测试：
+
+```bash
+uv run pytest -m 'not integration'
+```
+
+只运行集成测试：
+
+```bash
+uv run pytest -m integration
+```
+
+测试约定：
+
+- 新测试文件应跟目标模块命名对应，例如 `tests/unit/test_risk_manager.py`。
+- 能复用 `tests/conftest.py` 的 fixture 时优先复用，减少重复 mock。
+- 访问 Alpaca、外部数据库或真实 WebSocket 的测试必须标记为 `integration`。
+- 缺少外部依赖或凭证时，相关测试应明确跳过，避免在收集阶段直接失败。
+- 变更策略、风控、订单执行或存储层时，需要补充对应单元测试。影响完整流程时，再补 e2e 测试。
+
+## 配置与密钥
+
+- 复制 `.env.example` 为 `.env`，在本地填写 Alpaca 和数据库凭证。
+- 不要提交 `.env`、本地数据库、缓存、日志或图表输出。
+- 切换存储后端时修改 `config.yml` 的 `database.backend`，可选值为 `sqlite`、`parquet`、`postgresql`。
+- 使用 Docker live profile 时，`.env` 中必须有 `POSTGRES_PASSWORD`。
+- 修改数据库表结构时，请同步更新 `DBHandler`、相关测试和 README 中的数据说明。
+
+## 文档约定
+
+本仓库文档以中文为主。写文档时遵守这些规则：
+
+- 中文正文使用中文标点，例如 `（ ）`、`，`、`。`、`：`。
+- 保留必要的行内代码引用，例如 `config.yml`、`intraday backtest run`。
+- 避免中英混杂的长句。英文技术名词可保留，但解释尽量用中文。
+- 少用双引号、粗体和破折号。
+- 表达结论时直接写结论，少绕弯。
+- 课程资料可以保留，但要在开头标明归档性质，避免读者误以为它代表当前实现。
+
+## 提交与 PR
+
+提交信息使用简短的现在时描述，例如 `docs： polish README`、`tests： add cli parser coverage`。PR 中说明变更范围、测试结果、对交易行为或数据结构的影响。涉及仪表盘或 CLI 输出时，附上截图或命令输出片段。

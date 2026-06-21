@@ -7,6 +7,16 @@ from sqlalchemy import text
 from intraday_trader_air.db_handler import DBHandler
 
 
+def _parquet_engine_available() -> bool:
+    for module_name in ("pyarrow", "fastparquet"):
+        try:
+            __import__(module_name)
+            return True
+        except ImportError:
+            continue
+    return False
+
+
 def _sample_dataframe(index):
     return pd.DataFrame(
         {
@@ -62,6 +72,9 @@ def test_empty_dataframe_is_ignored_sqlite(tmp_path):
 
 
 def test_parquet_upsert_deduplicates_rows(tmp_path):
+    if not _parquet_engine_available():
+        pytest.skip("pyarrow or fastparquet is required for parquet storage tests")
+
     storage_dir = tmp_path / "parquet"
     handler = DBHandler({"backend": "parquet", "path": storage_dir})
 

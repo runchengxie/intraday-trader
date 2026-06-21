@@ -1,0 +1,1685 @@
+diff -ru /mnt/data/original_project/intraday-trader-air-main/.env.example /mnt/data/intraday_work/intraday-trader-air-main/.env.example
+--- /mnt/data/original_project/intraday-trader-air-main/.env.example	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/.env.example	2026-06-21 01:51:13.725444159 +0000
+@@ -1,3 +1,4 @@
+ APCA_API_KEY_ID="replace-with-your-apca-api-key-id"
+ APCA_API_SECRET_KEY="replace-with-your-apca-api-secret-key"
+-ALPACA_BASE_URL="https://paper-api.alpaca.markets"
+\ No newline at end of file
++ALPACA_BASE_URL="https://paper-api.alpaca.markets"
++POSTGRES_PASSWORD="replace-with-a-strong-local-password"
+diff -ru /mnt/data/original_project/intraday-trader-air-main/AGENTS.md /mnt/data/intraday_work/intraday-trader-air-main/AGENTS.md
+--- /mnt/data/original_project/intraday-trader-air-main/AGENTS.md	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/AGENTS.md	2026-06-21 01:51:13.724738387 +0000
+@@ -1,21 +1,93 @@
+-# Repository Guidelines
++# 仓库协作指南
+ 
+-## Project Structure & Module Organization
+-The production package lives in `src/intraday_trader_air/`, with `backtest/`, `strategies/`, and helper modules (`data_utils.py`, `risk_manager.py`, `dashboard_app.py`) forming the trading pipeline. CLI entrypoints reside in `src/intraday_trader_air/scripts/` and surface through the `intraday` command declared in `pyproject.toml`. Tests mirror the package under `tests/unit`, `tests/integration`, and `tests/e2e`; share fixtures in `tests/conftest.py`. Root-level automation files (`Makefile`, `docker-compose.yml`, `Dockerfile`) and `config.yml` drive orchestration, while reference material belongs in `docs/`.
++## 项目结构
+ 
+-## Build, Test, and Development Commands
+-- `uv sync && uv pip install -e .` sets up an editable environment with the dev toolchain.
+-- `intraday backtest run`, `intraday update-data`, and `intraday live` exercise the core workflows; pair flags like `--config config.yml` when experimenting.
+-- `make backtest`, `make lint`, `make fmt`, `make coverage`, and `make docker-live` wrap common tasks; compose profiles ensure TimescaleDB starts before the live bot.
++生产代码位于 `src/intraday_trader_air/`。其中：
+ 
+-## Coding Style & Naming Conventions
+-Follow Python 3.10 syntax, four-space indentation, and Ruff’s 88-character line limit. Modules and functions stay `snake_case`, classes use `PascalCase`, and constants remain uppercase. Run `uv run ruff check .` and `uv run ruff format .` before every push; justify any lint suppression in code review notes.
++- `backtest/` 放置回测请求对象与执行入口。
++- `strategies/` 放置策略基类、策略注册表和内置策略。
++- `scripts/` 放置 CLI 子命令实现。
++- `data_utils.py`、`db_handler.py`、`risk_manager.py`、`performance_analyzer.py`、`dashboard_app.py` 等模块组成数据、风控、分析和展示链路。
+ 
+-## Testing Guidelines
+-Pytest powers the suite. Use `uv run pytest` for fast smoke coverage and `make coverage` when preparing reports (`--cov=intraday_trader_air`). Apply the existing markers: `pytest -m integration` isolates external service calls, whereas `pytest -m "not integration"` keeps CI focused on unit tests. Name new files after their targets (e.g., `tests/unit/test_risk_manager.py`) and reuse fixtures rather than mocking brokers repeatedly.
++测试位于 `tests/`，分为 `unit`、`integration` 和 `e2e`。公共 fixture 放在 `tests/conftest.py`。根目录的 `Makefile`、`Dockerfile`、`docker-compose.yml` 和 `config.yml` 负责本地任务、镜像构建、服务编排和运行配置。
+ 
+-## Commit & Pull Request Guidelines
+-Commits follow a short, present-tense style (`Rename framework to intraday-trader-air`); add a scope prefix when helpful (`strategies: add ema crossover`). Ensure each commit passes lint and unit tests locally. Pull requests should link issues, call out trading-impacting changes, and attach screenshots or CLI excerpts for dashboard or terminal output.
++## 常用开发命令
+ 
+-## Environment & Configuration Tips
+-Copy `.env.example` to `.env` for Alpaca keys and database credentials, then keep the file out of version control. Switch storage backends through `config.yml` (`sqlite`, `parquet`, `postgresql`) and document schema migrations when altering tables. For Docker flows, prefer `docker compose --profile live up trading-bot` so the health checks gate the trading service on TimescaleDB readiness.
++```bash
++uv sync
++uv pip install -e .
++intraday backtest run
++intraday backtest run --strategy ema_crossover
++intraday backtest optimise
++intraday data backfill --fields trade_count,vwap
++intraday update-data
++intraday live
++intraday dashboard
++make lint
++make fmt
++make coverage
++make docker-live
++```
++
++项目要求 Python 3.10。`pyproject.toml` 限制为 `>=3.10,<3.11`，因此不要把 CI 或本地开发环境偷偷升级到 3.11 以上，然后再让错误信息替你写悬疑小说。
++
++## 代码风格
++
++- 使用四空格缩进。
++- 行宽遵守 Ruff 的 88 字符限制。
++- 模块、函数和变量使用 `snake_case`。
++- 类名使用 `PascalCase`。
++- 常量使用大写加下划线。
++- 提交前运行 `uv run ruff check .` 和 `uv run ruff format .`。
++- 如果必须忽略 lint 规则，请在评审说明里解释原因。
++
++## 测试要求
++
++常规测试：
++
++```bash
++uv run pytest
++```
++
++排除外部服务的测试：
++
++```bash
++uv run pytest -m 'not integration'
++```
++
++只运行集成测试：
++
++```bash
++uv run pytest -m integration
++```
++
++测试约定：
++
++- 新测试文件应跟目标模块命名对应，例如 `tests/unit/test_risk_manager.py`。
++- 能复用 `tests/conftest.py` 的 fixture 时优先复用，减少重复 mock。
++- 访问 Alpaca、外部数据库或真实 WebSocket 的测试必须标记为 `integration`。
++- 缺少外部依赖或凭证时，相关测试应明确跳过，避免在收集阶段直接失败。
++- 变更策略、风控、订单执行或存储层时，需要补充对应单元测试；影响完整流程时，再补 e2e 测试。
++
++## 配置与密钥
++
++- 复制 `.env.example` 为 `.env`，在本地填写 Alpaca 和数据库凭证。
++- 不要提交 `.env`、本地数据库、缓存、日志或图表输出。
++- 切换存储后端时修改 `config.yml` 的 `database.backend`，可选值为 `sqlite`、`parquet`、`postgresql`。
++- 使用 Docker live profile 时，`.env` 中必须有 `POSTGRES_PASSWORD`。
++- 修改数据库表结构时，请同步更新 `DBHandler`、相关测试和 README 中的数据说明。
++
++## 文档约定
++
++本仓库文档以中文为主。写文档时遵守这些规则：
++
++- 中文正文使用中文标点，例如 `（ ）`、`，`、`。`、`：`。
++- 保留必要的行内代码引用，例如 `config.yml`、`intraday backtest run`。
++- 避免中英混杂的长句；英文技术名词可保留，但解释尽量用中文。
++- 少用双引号、粗体和破折号。
++- 表达结论时直接写结论，少绕弯。
++- 课程资料可以保留，但要在开头标明归档性质，避免读者误以为它代表当前实现。
++
++## 提交与 PR
++
++提交信息使用简短的现在时描述，例如 `docs: polish README`、`tests: add cli parser coverage`。PR 中说明变更范围、测试结果、对交易行为或数据结构的影响。涉及仪表盘或 CLI 输出时，附上截图或命令输出片段。
+Only in /mnt/data/intraday_work/intraday-trader-air-main: LICENSE.txt
+diff -ru /mnt/data/original_project/intraday-trader-air-main/README.md /mnt/data/intraday_work/intraday-trader-air-main/README.md
+--- /mnt/data/original_project/intraday-trader-air-main/README.md	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/README.md	2026-06-21 01:51:13.724386341 +0000
+@@ -1,361 +1,300 @@
+-# T+0交易机器人
++# T+0 交易机器人
+ 
+-本项目提供一个可服务器部署的Python自动交易机器人，用于开发、回测与部署算法交易策略。默认采用轻量级的SQLite/Parquet缓存，方便在本地快速迭代；当需要更高性能或横向扩展时，可以通过`config.yml`切换到 TimescaleDB。该项目内置风险管理、绩效分析和Alpaca纸上交易API接入（有利于预演策略的效果）等组件
++Intraday Trader Air 是一个基于 Python 3.10 的日内量化交易项目，用来开发策略、回测策略、接入 Alpaca 纸上交易，并把行情、交易记录和绩效数据写入本地或数据库存储。项目当前覆盖 Backtrader 回测、三类内置策略、买入持有基准、风险检查、绩效分析、数据质量检查、Streamlit 仪表盘、Docker 与 Docker Compose 运行入口。
+ 
+-> ## 注意事项
+->
+-> 1. 最低净值：券商的实盘的日内交易一般都有≥25,000 美元净值的最低资本要求。
+->
+-> 2. 如需更快的日内/高频：尽量用SIP（或更直接的专线）而不是仅 IEX 片段数据，例如Alpaca的免费计划默认IEX，付费可用SIP，而IBKR 上真正高频态势通常意味着FIX/CTCI+专线/机房交叉连接，同时接受每月最低佣金门槛。
+->
+-> 3. 留意相关的风控指标：IBKR 有 OER（提交+修改+撤单 与 成交比）监控，过高会被警告/限流，策略要控制撤单风格。
++交易相关代码会直接影响资金安全。实盘前请先在 Alpaca Paper Trading 或等价模拟环境中验证策略、风控、订单状态同步和异常处理。日内交易还可能受到最低净值、行情源、券商风控、订单撤改单比例和监管要求影响，代码通过测试只能说明程序路径可运行，不能说明策略会赚钱。很遗憾，市场不会因为代码结构清晰就变得仁慈。
+ 
+-## 项目设计思路
++## 当前功能范围
+ 
+-### 支持服务器端的远程部署值守交易
+-
+-* 多阶段 Docker 构建：`Dockerfile` 使用 builder/runner 双阶段，先在完整镜像中构建 wheel，再在瘦身镜像中安装产物，默认启动命令即为 `run-live`，从构建到运行全流程封装。
+-
+-* Compose Profiles 分层：`docker-compose.yml` 将 TimescaleDB 与交易服务分别挂在 `db`、`live` profile 下，既可单独调试数据库，也能一次拉起完整实盘栈；健康检查和依赖顺序都已声明。
+-
+-* 输出挂载与 .dockerignore：容器默认把 `./output` 映射到 `/app/output`，配合 `.dockerignore` 隔离本地缓存与敏感文件，便于落地部署。
+-
+-### 可安装的 CLI 与脚本分发
+-
+-* `pyproject.toml` 声明 `intraday` 顶层命令，并在其下挂载 `backtest run/optimise/benchmark`、`update-data`、`live` 等子命令，安装后即可在任意环境调用。
+-
+-* `src/intraday_trader_air/cli.py` 提供统一分发器，保持子命令参数和返回码一致，方便在 CI 或调度器中批量调度。
+-
+-### 数据持久化与配置解耦
+-
+-* `config.yml` 中的 `database.backend` 支持 `sqlite`、`parquet` 与 `postgresql`，配合 `DBHandler` 可在无需改动代码的情况下切换存储。
+-
+-* `.env.example`、`.envrc.example` 提供标准化的密钥注入与虚拟环境自动化脚本，支持 `uv`、`pip` 双方案回退。
+-
+-### 已覆盖的运行场景
+-
+-| 场景 | 推荐方式 | 说明 |
+-| --- | --- | --- |
+-| 本地策略开发 / 快速回测 | 本地虚拟环境 | `uv sync && uv pip install -e .` 后即可使用 CLI，默认包含开发工具链。 |
+-| 需要 TimescaleDB、长期运行或团队协作 | Docker（`--profile live`） | 容器一次性拉起交易服务与 TimescaleDB，环境完全可复现。 |
+-| 只想调试数据库或接入 BI 工具 | Docker（`--profile db`） | 单独启动 TimescaleDB，供本地脚本或 BI 工具连接。 |
++### 策略与回测
++
++- 回测框架使用 Backtrader，统一入口位于 `intraday_trader_air.backtest.engine`。
++- 内置策略包括 `MeanReversionZScoreStrategy`、`EMACrossoverStrategy`、`CustomRatioStrategy` 和 `BuyAndHoldStrategy`。
++- `mean_reversion` 支持滚动 Z-Score、可选 `filtered_close` 输入和限价单参数。
++- `ema_crossover` 使用 EMA 交叉、ADX 过滤和移动止损参数。
++- `custom_ratio` 使用价格与长期均线的比值生成多空信号。
++- 回测输出包括最终资产、交易次数、胜率、净利润、夏普比率、最大回撤、年化收益、VaR、CVaR 和换手率。
++- 基准策略支持价格收益，也支持在 Alpaca 可返回股息数据时计算含股息总回报。
++- 参数优化读取 `config.yml` 中的 `strategies.*.opt_ranges`，并按 `backtest.max_cpus` 控制并行度。
++
++### 数据与存储
++
++- 行情数据通过 Alpaca API 拉取，默认标的、时间窗口和复权方式在 `config.yml` 的 `data` 段配置。
++- `fetch_historical_data` 会优先读取数据库和缓存，缺失时再请求 API，并把结果写回缓存或数据库。
++- `DBHandler` 支持 `sqlite`、`parquet` 和 `postgresql` 三类后端；使用 PostgreSQL 时会尝试创建 TimescaleDB hypertable。
++- `market_data` 表支持 `trade_count` 与 `vwap` 字段；旧缓存缺字段时，回测可自动降级估算，也可设置 `data.require_full_fields: true` 强制报错。
++- `intraday data backfill` 用来回补 `trade_count` 和 `vwap` 等字段。
++- `update-data` 会拉取配置标的在前一日的分钟线，并生成数据质量报告。
++- 数据质量检查覆盖时间戳顺序、重复时间戳、缺失 bar、空值和异常价格跳变。
++
++### 实盘联调与仪表盘
++
++- `intraday live` 启动 `EnhancedTradingSystem`，通过 `BrokerAPIHandler` 连接 Alpaca REST 与 WebSocket。
++- 实盘事件流以 `asyncio.Queue` 为中心，处理 trade、bar 和订单状态更新。
++- 下单前会调用 `RiskManager` 检查流动性、点差、市场冲击、杠杆和敞口。
++- `ConsistencyValidator` 提供回测与实盘信号、成交和绩效的一致性检查工具。
++- `no_fill_test_mode` 可以发出远离市场价格的测试单，并自动撤单，用于验证订单状态流。
++- `intraday dashboard` 启动 Streamlit 仪表盘，从数据库读取交易日志和绩效快照。
++
++### 当前已知局限
++
++- `intraday live` 的命令行入口目前没有创建并传入 `DBHandler`，所以实时交易默认主要依赖日志；若要把实盘快照直接写入数据库，需要把数据库句柄接入 `run_trading_session()`。
++- `EnhancedTradingSystem.stop_trading()` 当前调用了尚未实现的 `generate_comprehensive_report()`，停止流程中的最终报告生成还需要补齐。
++- `start_live_trading()` 中存在重复的初始账户与持仓刷新逻辑，功能上影响不大，但后续应清理。
++- Docker 的 `live` profile 会同时启动 TimescaleDB 和交易容器；数据库已经可供数据更新、报表和仪表盘使用，实盘入口的自动落库还需要继续打通。
++- 项目目前主要围绕单标的策略展开，多标的组合、交易所撮合延迟、订单簿深度、真实交易费用和断路器等细节尚未完整建模。
+ 
+ ## 架构总览
+ 
+-整体架构围绕一个中心化的数据层展开，既服务回测又支持实盘。以下流程图展示了各模块之间的交互关系：
+-
+ ```mermaid
+ flowchart LR
+-    subgraph Core_Services["核心服务"]
+-        direction LR
+-        DB_Handler[DBHandler]
+-        Database[(TimescaleDB)]
+-        DB_Handler -- "管理" --> Database
+-    end
+-
+-    subgraph Live_Trading["实时交易系统 (run-live)"]
+-        direction TB
+-        ETS[EnhancedTradingSystem]
+-        Broker[BrokerAPIHandler]
+-        Strat[Trading Strategy]
+-
+-        ETS -- "下单" --> Broker
+-        Broker -- "推送行情" --> ETS
+-        ETS -- "获取信号" --> Strat
+-    end
+-
+-    subgraph Backtest_and_Analytics["回测与分析"]
+-        direction TB
+-        BacktestScript[intraday backtest]
+-        ReportScript[run-generate-report]
+-        DashboardScript[run-dashboard]
+-        Data_Utils[data_utils.py]
+-
+-        BacktestScript -- "调用" --> Data_Utils
+-        Data_Utils -- "提供数据" --> BacktestScript
+-    end
+-
+-    subgraph Automation["自动化 (可选工作流)"]
+-        direction TB
+-        Cron_Data[每日数据更新]
+-        Cron_Backtest[每周回测]
+-
+-        Cron_Data --> Live_Trading
+-        Cron_Backtest --> Backtest_and_Analytics
+-    end
+-
+-    Live_Trading -- "记录交易与指标" --> DB_Handler
+-    Backtest_and_Analytics -- "查询历史数据" --> DB_Handler
+-    ReportScript -- "拉取数据" --> DB_Handler
+-    DashboardScript -- "可视化数据" --> DB_Handler
+-
+-    classDef core fill:#f9f,stroke:#333,stroke-width:1px;
+-    classDef db fill:#cde,stroke:#333,stroke-width:2px;
+-    classDef automation fill:#ffc,stroke:#333,stroke-width:1px;
+-    class ETS,Broker,Strat,BacktestScript,ReportScript,DashboardScript,Data_Utils core;
+-    class DB_Handler,Database db;
+-    class Cron_Data,Cron_Backtest automation;
++    Config[config.yml 和 .env] --> CLI[intraday CLI]
++    CLI --> Backtest[回测与参数优化]
++    CLI --> DataJob[数据更新与字段回补]
++    CLI --> Live[纸上交易引擎]
++    CLI --> Report[日报与仪表盘]
++
++    DataJob --> Alpaca[Alpaca API]
++    Live --> Alpaca
++    Alpaca --> DataLayer[DBHandler]
++    Backtest --> DataLayer
++    DataLayer --> Storage[(SQLite / Parquet / PostgreSQL / TimescaleDB)]
++
++    Backtest --> Strategies[策略注册表]
++    Live --> LiveStrategy[实时均值回归策略]
++    Live --> Risk[RiskManager]
++    Live --> Validator[ConsistencyValidator]
++    Report --> Analyzer[PerformanceAnalyzer]
++    Report --> Storage
+ ```
+ 
+ ## 快速开始
+ 
+-你可以选择使用 Docker（可选，用于可复现/部署）或本地 Python 环境来运行项目。下面分别介绍两种方式的具体步骤，同时提供 `Makefile` 快捷命令。
+-
+-### 方式一：Docker（按需，可复现/部署用）
+-
+-1. 克隆仓库
+-
+-    ```bash
+-    git clone https://github.com/runchengxie/intraday-trader-air.git
+-    cd intraday-trader-air
+-    ```
+-
+-2. 创建环境变量文件
+-
+-    ```bash
+-    cp .env.example .env
+-    ```
+-
+-    如果需要 TimescaleDB，请额外在 `.env` 中定义 `POSTGRES_PASSWORD`，并确保密钥不会提交到版本库。
+-
+-3. 启动服务
+-
+-    ```bash
+-    # 等价命令：make docker-live
+-    docker compose --profile live up trading-bot
+-    ```
+-
+-    `--profile live` 会同时拉起交易机器人与 TimescaleDB；若只需要数据库，可执行 `docker compose --profile db up db`。使用 `CTRL+C` 停止服务，或通过 `docker compose down` 清理容器与网络。
+-    Docker Compose 会自动将数据库连接字段（`DB_BACKEND=postgresql` 以及 `DB_HOST/PORT/USER/PASSWORD/NAME`）注入交易容器，对应的 `config.yml` 会读取这些环境变量完成 TimescaleDB 对接。
+-
+-### 方式二：本地 Python 环境
+-
+-1. 创建虚拟环境
+-
+-    ```bash
+-    # 推荐使用 uv
+-    uv venv
+-    source .venv/bin/activate
+-
+-    # 或使用标准库 venv
+-    # python -m venv .venv
+-    # source .venv/bin/activate
+-    ```
+-
+-2. 安装依赖并注册 CLI 命令
+-
+-    ```bash
+-    uv sync
+-    uv pip install -e .
+-    ```
+-
+-    `uv sync` 会默认安装 `dev` 依赖组（测试、lint 与 Jupyter 工具）。如果只想安装最小集，可执行 `UV_NO_DEV=1 uv sync --frozen`（或 `uv sync --no-dev --frozen`），再运行 `uv pip install -e .`。默认情况下 `uv` 会忽略当前 shell 已激活的其他虚拟环境并使用项目根目录下的 `.venv`；若确实希望复用已激活环境，可在命令后加上 `--active`。
+-
+-3. 配置凭证
+-
+-    将 Alpaca API Key 写入 `.env` 或操作系统的环境变量中：
+-
+-    ```bash
+-    export APCA_API_KEY_ID="你的 Key"
+-    export APCA_API_SECRET_KEY="你的 Secret"
+-    export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
+-    ```
+-
+-4. 运行命令行工具
+-
+-    * 更新行情数据：`intraday update-data`
+-
+-    * 回补缺失行情字段：`intraday data backfill --fields trade_count,vwap`
+-
+-    * 回测策略：`intraday backtest run`
+-
+-    * 参数优化：`intraday backtest optimise`
+-
+-    * 基准对比：`intraday backtest benchmark`
+-
+-    * 生成报表：`intraday generate-report`
+-
+-    * 启动纸上交易：`intraday live`
++### 环境要求
+ 
+-    * 启动仪表盘：`intraday dashboard`
++- Python 版本应为 3.10。`pyproject.toml` 明确限制为 `>=3.10,<3.11`。
++- 推荐使用 `uv` 管理环境；也可以用标准库 `venv` 加 `pip`。
++- 使用 Alpaca 相关命令前，需要准备 `APCA_API_KEY_ID`、`APCA_API_SECRET_KEY` 和 `ALPACA_BASE_URL`。
+ 
+-   #### 回测/优化常用参数
++### 本地安装
+ 
+-   * 默认情况下，`run-backtest` 会先运行买入持有基准，再依次执行配置文件中的全部策略。如果希望只测试部分策略，可多次传入 `--strategy`：
+-
+-    ```bash
+-    # 在不指定选项的时候将同时完成三个策略和 benchmark 的回测
+-    run-backtest
+-
+-    # 只运行 ema_crossover 策略
+-    run-backtest --strategy ema_crossover
+-
+-    # 只运行 mean_reversion 策略
+-    run-backtest --strategy mean_reversion
+-
+-    # 只运行 custom_ratio 策略
+-    run-backtest --strategy custom_ratio
+-
+-    # 指定同时跑多个策略的回测
+-    run-backtest --strategy ema_crossover --strategy mean_reversion
+-    ```
++```bash
++uv venv
++source .venv/bin/activate
++uv sync
++uv pip install -e .
++```
+ 
+-* 若只想生成买入持有序列，可使用 `run-backtest benchmark` 或在 `run` 命令中附加 `--no-benchmark` 关闭基准：
++如果只安装运行时依赖，可以使用：
+ 
+-    ```bash
+-     run-backtest --no-benchmark
+-    ```
++```bash
++UV_NO_DEV=1 uv sync --frozen
++uv pip install -e .
++```
+ 
+-* 若希望回测阶段严格要求 `trade_count` 与 `vwap` 均来自数据库缓存，可在 `config.yml` 的 `data.require_full_fields` 字段设置为 `true`。若验证失败，CLI 会提示先执行 `run-backfill` 以补齐历史缺失列。
++`uv` 默认会使用项目目录下的 `.venv`。需要复用当前 shell 已激活的环境时，可以给 `uv` 命令加 `--active`。
+ 
+-* `run-backtest optimise` 会读取策略在 `config.yml` 中声明的 `opt_ranges` 网格，并对所选策略逐个搜索。与回测一样，不传 `--strategy` 时会对全部策略执行网格搜索。
++### 配置密钥
+ 
+-* 回测、优化和数据更新命令会将日志写入 `output/logs`，图表输出至 `output/charts`（可在 `config.yml` 的 `paths` 段自定义）。
++```bash
++cp .env.example .env
++```
+ 
+-    若需仪表盘，安装时请带上 `dashboard` 可选依赖：
++然后在 `.env` 中填写 Alpaca 密钥。若使用 Docker Compose 的数据库服务，还需要填写 `POSTGRES_PASSWORD`。
+ 
+-    ```bash
+-    uv pip install -e '.[dashboard]'
+-    # 或
+-    pip install -e '.[dashboard]'
+-    ```
++```bash
++APCA_API_KEY_ID=replace-with-your-apca-api-key-id
++APCA_API_SECRET_KEY=replace-with-your-apca-api-secret-key
++ALPACA_BASE_URL=https://paper-api.alpaca.markets
++POSTGRES_PASSWORD=replace-with-a-strong-local-password
++```
+ 
+-### 常用 Make 命令
++### 常用命令
+ 
+ ```bash
+-make help                # 查看所有常用命令
+-make sync                # 安装/同步依赖（默认使用项目内 .venv）
+-make backtest ARGS='…'   # 本地回测，可通过 ARGS 透传 --strategy 等参数
+-make optimise ARGS='…'   # 仅对选定策略执行参数搜索
+-make benchmark           # 单独生成买入持有基准
+-make update              # 更新数据缓存
+-make fmt                 # 使用 Ruff Formatter 自动格式化
+-make coverage            # 运行 pytest 并输出覆盖率
+-make docker-live         # 容器模式启动交易服务 + DB
+-make docker-db           # 仅启动 TimescaleDB（容器）
++intraday update-data
++intraday data backfill --fields trade_count,vwap
++intraday backtest run
++intraday backtest run --strategy ema_crossover
++intraday backtest run --strategy mean_reversion --strategy custom_ratio
++intraday backtest run --no-benchmark
++intraday backtest optimise
++intraday backtest optimize
++intraday backtest benchmark
++intraday generate-report
++intraday live
++intraday dashboard
+ ```
+ 
+-如需使用当前已激活的虚拟环境运行 `make` 目标，可附加 `USE_ACTIVE=1`：`make backtest USE_ACTIVE=1`。
++`optimise` 和 `optimize` 都可以使用，二者指向同一个参数优化入口。旧脚本入口仍然保留，例如 `run-backtest`、`run-live`、`run-update-data`、`run-generate-report` 和 `run-dashboard`；新文档统一推荐使用 `intraday` 顶层命令，免得入口像地铁换乘一样越走越迷。
+ 
+-## CLI 命令手册
++### Docker 运行
+ 
+-| 命令 | 目标 | 关键操作 | 主要产出 |
+-| --- | --- | --- | --- |
+-| `update-data` | 获取最新行情并写入缓存/数据库 | 读取 `.env` 中的 Alpaca 密钥，调用 `fetch_historical_data` 并通过 `DBHandler` 写入 TimescaleDB/SQLite | `output/cache/` 下的 Parquet/SQLite 刷新；数据库 K 线数据 |
+-| `backtest run` | 运行单次回测 | 初始化日志目录、载入策略，生成图表/日志并可写入数据库 | `output/logs/trading_log_*.log`、`output/charts/*.png`、控制台指标汇总 |
+-| `backtest optimise` | 执行参数优化 | 结合 `strategies.*.opt_ranges` 并行搜索参数组合，输出前十结果 | 控制台排名输出、日志记录 |
+-| `backtest benchmark` | 仅运行基准 | 运行配置中的基准策略，可选计算含分红总回报 | 基准指标与图表 |
+-| `generate-report` | 汇总交易日志与绩效快照生成日报 | 从数据库提取 24 小时交易与绩效数据，调用 `PerformanceAnalyzer` 输出报告 | `output/daily_report_YYYYMMDD.json` |
+-| `live` | 启动纸上交易执行引擎 | 初始化 `EnhancedTradingSystem`、订阅 Alpaca WebSocket、前置风险检查、异步处理订单 | `output/logs/` 中的实时日志、数据库中的交易/绩效快照 |
+-| `dashboard` | 启动 Streamlit 仪表盘 | 调用 `streamlit run dashboard_app.py` 并监听本地端口 | Web UI（默认 <http://localhost:8501）> |
+-
+-### 命令详解
++```bash
++cp .env.example .env
++# 填写 .env 中的 Alpaca 密钥和 POSTGRES_PASSWORD
+ 
+-* update-data：脚本会先加载 `.env`，然后根据 `config.yml` 中的 `data.ticker` 与时间范围决定拉取的标的与窗口，支持向缓存目录写入 Parquet 文件并通过 `DBHandler.initialize_db()` 创建所需表结构。
++docker compose --profile live up trading-bot
++```
+ 
+-* backtest run：除策略回测外，会根据 `config.yml.paths` 自动创建日志、图表、缓存目录，并把运行日志写入 `output/logs/trading_log_*.log`。若配置基准并启用 `benchmark.total_return`，会自动汇总股息到总回报指标。
++只启动数据库：
+ 
+-* backtest optimise：尊重 `backtest.max_cpus` 并行执行参数搜索，输出 `Final Value`、`Sharpe Ratio` 等指标的前十名列表。
++```bash
++docker compose --profile db up db
++```
+ 
+-* backtest benchmark：只运行基准策略，适合在 CI 中做快速健诊，也可以单独查看含分红/不含分红的收益差异。
++停止服务可以使用 `CTRL+C`，清理容器与网络可以使用：
+ 
+-* generate-report：默认取最近 24 小时的交易与绩效快照，借助 `PerformanceAnalyzer.generate_performance_report()` 生成 JSON 文档，便于上游任务继续处理或推送。
++```bash
++docker compose down
++```
+ 
+-* live：`EnhancedTradingSystem` 内部组合了 `RiskManager`、`PerformanceAnalyzer`、`ConsistencyValidator` 与 `BrokerAPIHandler`，所有订单在入队前都会通过风险检查；同时支持 `no_fill_test_mode` 进行“不会成交”的联调演练。
++## Makefile 快捷命令
+ 
+-* dashboard：如果仓库安装了 `dashboard` 可选依赖，会启动 Streamlit 应用，实时展示数据库中的账户表现与风险指标。
++```bash
++make help
++make sync
++make backtest ARGS='--strategy ema_crossover'
++make optimise ARGS='--strategy mean_reversion'
++make benchmark
++make update
++make live
++make dashboard
++make lint
++make fmt
++make coverage
++make docker-build
++make docker-live
++make docker-db
++```
+ 
+-## 配置、环境与密钥管理
++如需使用当前已激活的虚拟环境运行 `make` 目标，可以追加 `USE_ACTIVE=1`：
+ 
+-* `.env.example` / `.envrc.example`：提供标准化模板，推荐复制后结合 `direnv` 或 `dotenv` 自动注入。`.envrc` 会优先尝试 `uv sync`，失败后再退回 `python -m venv` + `pip install`，并支持 `UV_NO_DEV=1` 禁用开发依赖。
++```bash
++make backtest USE_ACTIVE=1 ARGS='--strategy ema_crossover'
++```
+ 
+-* `config.yml`：支持通过 `${ENV_VAR:-default}` 语法注入环境变量；数据库后端、日志等级、策略参数都集中管理。部署时只需修改配置或环境变量即可切换行情标的、数据库或风控阈值。数据库段默认回落到本地 SQLite，当注入 `DB_BACKEND=postgresql` 时则使用 `DB_HOST/PORT/USER/PASSWORD/NAME` 与 TimescaleDB 建立连接。
++## CLI 命令说明
+ 
+-* Docker 场景：`docker-compose.yml` 会把主机的环境变量透传给交易容器，并通过卷挂载持久化输出目录；TimescaleDB 密码同样从 `.env` 自动注入。
++| 命令 | 用途 | 主要产出 |
++| --- | --- | --- |
++| `intraday update-data` | 拉取配置标的前一日分钟线，写入缓存和数据库，并运行数据质量检查。 | `output/cache/`、`output/data_qc_*.json`、数据库行情表 |
++| `intraday data backfill` | 按配置日期范围或命令行参数，回补 `trade_count`、`vwap` 等行情字段。 | 更新后的 `market_data` |
++| `intraday backtest run` | 运行买入持有基准和选定策略的单次回测。 | 控制台指标、`output/logs/`、`output/charts/` |
++| `intraday backtest optimise` | 按 `opt_ranges` 搜索策略参数。 | 控制台前十名参数组合和日志 |
++| `intraday backtest benchmark` | 只运行配置中的买入持有基准。 | 基准指标和图表 |
++| `intraday generate-report` | 汇总最近 24 小时的交易日志和绩效快照。 | `output/daily_report_YYYYMMDD.json` |
++| `intraday live` | 启动 Alpaca 纸上交易事件循环。 | 实时日志和订单状态处理 |
++| `intraday dashboard` | 启动 Streamlit 仪表盘。 | 默认本地 Web 页面：<http://localhost:8501> |
++
++## 配置文件要点
++
++`config.yml` 是主要配置入口：
++
++- `alpaca`：从环境变量读取 API 密钥和接口地址。
++- `data`：设置标的、回测时间范围、K 线周期、复权方式和字段完整性要求。
++- `paths`：设置输出、日志、图表和缓存目录。
++- `benchmark`：设置买入持有基准和股息总回报开关。
++- `database`：设置 `sqlite`、`parquet` 或 `postgresql` 后端。
++- `backtest`：设置初始资金、佣金、滑点和最大 CPU 数。
++- `strategies`：设置策略类、参数、优化网格和订单参数。
++- `live_trading`：设置纸上交易标的、初始资金、no-fill 测试和风控阈值。
++- `logging`：设置日志等级、格式和时间格式。
+ 
+-* 安全提醒：永远不要把密钥写入版本库，可将 `.env`、`.envrc` 保持在本地，同时利用 `.dockerignore` 避免构建镜像时打包敏感文件。
++环境变量支持 `${ENV_VAR:-default}` 形式。通用配置加载器 `intraday_trader_air.configuration.load_app_config()` 已支持默认值替换。需要注意，`run_live_trading.py` 内部还有一个旧版 YAML 加载函数，默认值替换能力较弱，后续最好统一到通用配置加载器。
+ 
+-## 风控参数与执行流程
++## 风控参数
+ 
+-`config.yml` 的 `live_trading.risk_limits` 定义了下单前的硬约束，`RiskManager` 会在行情更新与订单评估时逐项验证：
++`config.yml` 的 `live_trading.risk_limits` 定义下单前的限制：
+ 
+ | 参数 | 含义 | 默认值 |
+ | --- | --- | --- |
+-| `max_order_participation_ratio` | 单笔委托不得超过近期成交量的比例，防止过度冲击市场 | 0.02 |
+-| `max_bid_ask_spread_pct` | 可接受的最大点差百分比，避免在流动性极低时入场 | 0.005 |
+-| `market_impact_coefficient` | 冲击成本模型系数，用于估计成交滑点 | 0.5 |
+-| `max_gross_exposure` | 多空绝对敞口占净值的上限 | 1.5 |
+-| `max_leverage` | 总资产 / 净资产的最大杠杆倍数 | 2.0 |
+-| `max_var` / `max_concentration` / `min_liquidity` | VaR、单标的集中度与最小流动性门槛 | 0.05 / 0.3 / 1,000,000 |
+-
+-风控流程简述：行情经 `RiskManager.update_market_data()` 累积历史窗口 → `_perform_risk_checks` 检测价格跳变、量能突增、流动性不足 → 下单前调用 `check_liquidity_and_impact()`、`check_leverage_and_exposure()` 等函数，若超限则返回告警并阻止订单入队。
+-
+-## 实盘运行与组件职责
+-
+-`run_live_trading.py` 中的 `EnhancedTradingSystem` 以异步队列为中心组织事件流：
+-
+-* 数据通路：`BrokerAPIHandler` 订阅行情与订单状态，通过 `asyncio.Queue` 推给策略与风控组件；断线自动重连，并在更新时记录详细日志。
+-
+-* 风险管理：`RiskManager` 在订单生成前执行流动性、敞口、VaR 等校验；`ConsistencyValidator` 负责检查状态一致性与异常回调。
++| `max_order_participation_ratio` | 单笔订单占近期成交量的上限。 | 0.02 |
++| `max_bid_ask_spread_pct` | 可接受的最大买卖价差比例。 | 0.005 |
++| `market_impact_coefficient` | 估算市场冲击成本的系数。 | 0.5 |
++| `max_gross_exposure` | 多空绝对敞口相对净值的上限。 | 1.5 |
++| `max_leverage` | 总资产相对净资产的最大倍数。 | 2.0 |
++| `max_var` | VaR 上限。 | 0.05 |
++| `max_concentration` | 单标的集中度上限。 | 0.3 |
++| `min_liquidity` | 最低流动性门槛。 | 1,000,000 |
+ 
+-* 绩效追踪：`PerformanceAnalyzer` 按分钟写入投资组合快照，可配合 `DBHandler.log_performance_snapshot()` 存档，供日报与仪表盘读取。
++基本流程：行情进入 `RiskManager.update_market_data()` 后，系统会检查价格跳变、成交量异常和流动性风险；下单前再调用 `check_liquidity_and_impact()` 与 `check_leverage_and_exposure()`，超限时阻止订单继续执行。
+ 
+-* 联调模式：`no_fill_test_mode` 允许注入永不成交的测试单（通过价格偏移和自动撤单），用于验证消息流与风控逻辑。
++## 测试
+ 
+-## 自动化调度（可选模板）
++完整测试环境应先执行：
+ 
+-仓库未直接附带 GitHub Actions Workflow 文件，但 CLI 已适配批处理场景。你可以基于下表快速创建调度脚本或 Actions 工作流：
+-
+-| 任务 | 推荐频率 | 命令 | 备注 |
+-| --- | --- | --- | --- |
+-| 行情更新 | 每日开盘前 | `intraday update-data` | 需要 Alpaca API 密钥与数据库连接 |
+-| 回测回归 | 每周或策略改动时 | `intraday backtest run` / `intraday backtest optimise` | 可结合参数优化输出对比图表 |
+-| 日报生成 | 每日收盘后 | `intraday generate-report` | 产出 JSON，可再由 CI 推送到 S3/钉钉等 |
+-
+-若在 GitHub Actions 部署，请记得在仓库 Secrets 中配置 Alpaca 凭证与数据库密码。
+-
+-## Roadmap / 已知局限
+-
+-* 成交模型待加强：当前冲击成本为静态系数，后续计划引入基于订单簿深度的动态模型。
++```bash
++uv sync
++uv pip install -e .
++```
+ 
+-* 执行算法有限：实盘仅提供均值回归策略，后续会补充 VWAP/TWAP 等算法。
++常用测试命令：
+ 
+-* 回测逼真度：仍待模拟交易所费用、断路器、撮合延迟等细节；当前版本已支持基准含分红收益与 `max_cpus` 自适应，但真实成交建模仍有提升空间。
++```bash
++uv run pytest
++uv run pytest -m 'not integration'
++uv run pytest -m integration
++make coverage
++```
+ 
+-* 策略扩展：虽有策略注册表，但缺少模板与文档指导多标的、多频率策略的接入。
++测试目录结构：
+ 
+-* 回放测试：目前无历史行情回放的集成测试场景，建议未来补充。
++- `tests/unit/`：配置、数据质量、存储、风控、绩效分析、策略和实盘组件的单元测试。
++- `tests/integration/`：Alpaca 与数据库集成测试，需要外部服务或凭证。
++- `tests/e2e/`：回测工作流端到端测试。
++- `tests/conftest.py`：公共 fixture，包括临时输出目录、配置对象、Alpaca stub 和轻量版 `mocker`。
++
++当前测试脚本已经使用 `pytest.importorskip` 跳过缺失依赖的部分用例；集成测试还会检查 Alpaca 凭证。若在非 Python 3.10 或未安装依赖的环境中直接运行，测试结果只能说明当前环境不完整，不能代表项目本身的完整测试状态。
++
++## 文档索引
++
++| 文件 | 内容 |
++| --- | --- |
++| `AGENTS.md` | 仓库协作、测试、代码风格和文档书写约定。 |
++| `docs/current_project_overview.md` | 当前代码能力、测试覆盖和已知技术债说明。 |
++| `docs/project_requirements.md` | 课程中算法交易题目的中文整理。 |
++| `docs/additional_guide.md` | 均值回归、趋势跟随、风险评估和因子分析的补充笔记。 |
++| `docs/general_requirements.md` | 课程项目通用要求的中文整理。 |
++| `docs/general_requirements_2.md` | 课程简报要求的中文整理。 |
++| `docs/exam_guidelines.md` | 课程考试说明归档。 |
+ 
+ ## 项目结构
+ 
+ ```tree
+ .
+-├── src/intraday_trader_air/   # 核心代码（策略、数据、风险、实盘引擎）
+-│   └── strategies/               # 策略包（含基类、注册表与具体策略实现）
+-├── tests/                        # 单元测试与集成测试
+-├── docs/                         # 文档与设计说明
+-├── project_tools/                # 开发工具与辅助脚本
+-├── Makefile                      # 本地与 Docker 工作流统一入口
+-├── config.yml                    # 全局配置（策略参数、数据源、数据库）
+-├── docker-compose.yml            # Docker 编排配置
+-├── Dockerfile                    # 多阶段构建产物镜像
+-└── pyproject.toml                # 项目依赖与打包信息
++├── src/intraday_trader_air/      # 核心代码
++│   ├── backtest/                 # 回测请求对象与执行入口
++│   ├── scripts/                  # CLI 子命令实现
++│   └── strategies/               # 策略基类、注册表和内置策略
++├── tests/                        # 单元测试、集成测试和端到端测试
++├── docs/                         # 当前说明文档与课程资料归档
++├── project_tools/                # 开发辅助脚本
++├── Makefile                      # 本地和 Docker 常用任务
++├── config.yml                    # 全局配置
++├── docker-compose.yml            # Docker Compose 服务定义
++├── Dockerfile                    # 多阶段镜像构建
++└── pyproject.toml                # 依赖、打包和工具配置
+ ```
+ 
+-## 常见问题（FAQ）
++## 常见问题
++
++1. 一定要用 TimescaleDB 吗？
++
++   不需要。默认配置使用 SQLite，本地快速试验足够。需要更长历史、多进程读写或团队共享时，再切换到 PostgreSQL/TimescaleDB。
+ 
+-1. 一定要用 TimescaleDB 吗？ 不需要。默认使用 SQLite/Parquet 缓存，等需要更长历史或多标的并发查询时，再切换到 TimescaleDB 即可。
++2. Alpaca 账号必须绑定真实资金吗？
+ 
+-2. Alpaca 账号必须是真实资金吗？ 不需要。推荐使用 Alpaca Paper Trading（模拟账户）完成联调。
++   不需要。推荐先使用 Alpaca Paper Trading 完成策略、风控和订单状态联调。
+ 
+-3. Docker 是必须的吗？ 不是。Docker 仅提供可复现环境，本地虚拟环境照样可以直接运行脚本。
++3. Docker 是强制要求吗？
+ 
+-4. 如何扩展新策略？ 在 `src/intraday_trader_air/strategies/` 下新增策略类，并在 `config.yml` 中配置参数，随后在 CLI 中切换使用。
++   不强制。Docker 负责提供可复现运行环境，本地虚拟环境也可以运行同一套 CLI。
+ 
+-5. 如何切换数据存储后端？ 编辑 `config.yml` 的 `database` 配置块即可。示例：
++4. 如何扩展新策略？
+ 
+-    * 使用 SQLite：保持默认 `backend: sqlite` 与 `path: output/trading.db`
++   在 `src/intraday_trader_air/strategies/` 中新增策略类，把类加入 `REGISTRY`，再在 `config.yml` 的 `strategies` 段配置参数和优化网格。
+ 
+-    * 使用 Parquet：设置 `backend: parquet` 并调整 `path`
++5. 如何切换数据存储后端？
+ 
+-    * 使用 TimescaleDB/PostgreSQL：设置 `backend: postgresql`，并通过环境变量或直接在配置中补充 `host/port/user/password/dbname`
++   修改 `config.yml` 的 `database.backend`。可选值为 `sqlite`、`parquet` 和 `postgresql`。使用 PostgreSQL 时，需要同时提供 `host`、`port`、`user`、`password` 和 `dbname`。
+diff -ru /mnt/data/original_project/intraday-trader-air-main/docs/additional_guide.md /mnt/data/intraday_work/intraday-trader-air-main/docs/additional_guide.md
+--- /mnt/data/original_project/intraday-trader-air-main/docs/additional_guide.md	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/docs/additional_guide.md	2026-06-21 01:51:13.725000549 +0000
+@@ -1,30 +1,45 @@
+-# Algorithmic Trading for Reversion and Trend-Following
++# 均值回归与趋势跟随补充资料
+ 
+-> **课堂参考**：此指南保留课堂作业中的补充说明，当前仓库采纳部分思路，但具体执行细节以最新代码与文档为准。
++> 课程资料归档：本文整理自课程补充笔记，用来解释策略设计、风险评估和绩效归因思路。当前仓库的真实功能以 `README.md`、`AGENTS.md` 和代码为准。
+ 
+-## Introduction
++## 策略目标
+ 
+-Part I. Implement at least (a) one mean-reversion strategy with a specific indicator of your choice AND (b) one trend-following strategy with several indicators of your choice. Rule-based strategy code to produce P&L plot.
++课程要求至少实现一类均值回归策略和一类趋势跟随策略，并用规则化代码生成 P&L 曲线。后续阶段可以把历史回测扩展到接近实盘的事件驱动测试，重点检查订单处理、成交状态、撤单、部分成交和券商返回信息的一致性。
+ 
+-Event-driven backtesting / life-like testing in Parts II and III. Code must have routines on order handling, including re-verification of server responses (eg, order cancelled, partially filled, returned with an incorrect info).
++当前项目已经实现三类策略：
+ 
+-## Simple but Effective Trend Following in FX
++- `MeanReversionZScoreStrategy`：用滚动 Z-Score 判断价格偏离均值的程度。
++- `EMACrossoverStrategy`：用 EMA 交叉识别趋势，并用 ADX 过滤弱趋势。
++- `CustomRatioStrategy`：比较当前价格与长期均线的比例。
+ 
+-* **Step 1:** resample the prices at regular intervals (eg, 30 seconds); can use `pandas` resample method.
++## 简单趋势指标
+ 
+-* **Step 2:** calculate an average price over the longer period (eg, past five-minute intervals). Implement trading logic to open a position when market prices deviate from that average, and close the position when prices revert back to it.
++一个常见的趋势跟随思路如下：
+ 
+-* **Step 3:** compute the ratio of the short-term average to the long-term average price. No trend is signaled by the ratio of 1, short-term prices ≈ the long-term prices. Uptrend signaled by the ratio above 1, and downtrend by less than 1.
++1. 按固定间隔重采样价格，例如 30 秒、1 分钟或 15 分钟。
++2. 计算较长窗口内的平均价格，例如 5 分钟均价。
++3. 计算短期价格或短期均价与长期均价的比例。
++4. 比例接近 1 时，说明短期价格接近长期均价；比例大于 1 表示偏强；比例小于 1 表示偏弱。
+ 
+-## Trend-Following Indicators
++在 pandas 中可以使用 `DataFrame.resample()` 完成重采样。
+ 
+-Common indicators: Moving Averages, Exponential Moving Averages (EMA), Average Directional Index (ADX).
++## 趋势跟随指标
+ 
+-EMAt = αPt + (1 − α)EMAt-1
++常见趋势指标包括移动均线、指数移动均线（EMA）、平均趋向指数（ADX）和 MACD。
+ 
+-choice of α is practical, discussed in TUT Market Prediction.
++EMA 的递推形式：
+ 
+-MACD = EMAshort − EMAlong
++```text
++EMA_t = αP_t + （1 − α）EMA_{t-1}
++```
++
++MACD 的常见形式：
++
++```text
++MACD = EMA_short − EMA_long
++```
++
++示例代码：
+ 
+ ```python
+ data['EMA_12'] = data['Close'].ewm(span=12, adjust=False).mean()
+@@ -32,170 +47,84 @@
+ data['MACD'] = data['EMA_12'] - data['EMA_26']
+ ```
+ 
+-## Broker API - REST
+-
+-1. Alpaca, IB Web, and Oanda. Alpaca REST API is free and includes asynchronous events handling based on WebSocket and Server Side Events (SSE).
+-
+-2. Utilizes HTTP methods, eg GET (retrieve data), POST (create new data), PUT (update data). Useable for non-time-critical operations such as retrieving historical data, account information, placing orders, and getting order status.
+-
+-## Broker API - FIX
+-
+-1. The more industrial strength and lower latency API choice is FIX (Financial Information eXchange). A messaging protocol designed for the real-time exchange.
+-
+-2. Supports submission and cancellation of various order types, trade execution reports, and market data dissemination – all for high frequency trading. FIX is used by large institutions, funds, and broker/dealers.
+-
+-## Risk Management
+-
+-* **Data Work and Features.** Retrieving historical data, tick data, candles data.
+-
+-* **Systematic Backtesting** (eg, concentration in asset, Beta-to-SPY) are of no utility for this type of algo trading project, however for overall performance evaluation it's useful to provide a tearsheet with information about turnover.
+-
+-    1. Compute Drawdowns, Sharpe Ratio and Value-at-Risk as adapted (it is over the period, which can include unequal number of transactions).
+-
+-    2. Consider computation of Kelly Criterion for bet size.
+-
+-READING *Python for Finance Mastering Data-Driven Finance* by Yves Hilpisch.
+-
+-## Algorithmic Flow
+-
+-* Optionally, introduce liquidity and algorithmic flow considerations (a model of order flow). How would you be entering and accumulating the position? What impact *your transactions* will make on the market order book?
+-
+-* Related issue is the possible leverage for the strategy. While the maximum leverage is 1/Margin, the more adequate solution is a maximally leveraged market-neutral gain or alpha-to-margin ratio.
+-
+-    AM = α / Margin
+-
+-## Developing a Trading Business
+-
+-There are libraries for anything: data processing, times series and techniques from ML, and tear sheets/trading analytics.
+-
+-## EXTRA. Trading Strategy Evaluation - relevant to topics TS, ML, and AL
+-
+-* Systematic Backtesting: alpha and rolling beta. Drawdown Control
+-
+-* Ratios and Scorecards
+-
+-* (Algorithmic Trading Efficiency)
+-
+-`https://github.com/stefan-jansen/pyfolio-reloaded`
+-
+-## Systematic Backtesting
+-
+-1. We will look at **how to relate P&L** to the market and factors, to understand what drives P&L, what you make money on.
+-
+-2. Then, we will talk about **evaluating P&L** with drawdown control and VaR.
+-
+-3. You can look for suitable models for algorithmic **order flow** and liquidity impact. [Optional]
+-
+-## Alpha and Beta
++## Broker API
+ 
+-**Beta** is the strategy's market exposure, for which you should not pay much as it is easy to gain by buying an ETF or index futures contract.
++REST API 适合历史数据、账户信息、普通下单和订单状态查询。Alpaca、Interactive Brokers Web API 和 Oanda 都提供类似接口。REST 请求通常使用 `GET`、`POST`、`PUT` 等 HTTP 方法。
+ 
+-**Alpha** is the excess return after subtracting return due to market movements.
++FIX API 面向更低延迟的交易场景，支持订单提交、撤单、成交回报和行情分发。它更接近机构级交易基础设施，使用成本和维护成本也更高。
+ 
+-RSt = α + βRMt + εt
++本项目当前使用 Alpaca REST 与 WebSocket，适合纸上交易和教学级联调。真正的低延迟交易还需要行情源、网络链路、托管位置、订单路由和券商限流等额外设计。
+ 
+-E[RSt − βRMt] = α
++## 风险管理
+ 
+-**RMt = Rt − rƒ** is the time series of returns representing **the market factor**.
++日内策略至少要关注这些风险：
+ 
+-## Risk-Reward Ratios
++- 数据质量：时间戳重复、缺失 bar、空值、异常价格跳变。
++- 流动性：成交量不足、点差过宽、订单参与率过高。
++- 杠杆与敞口：总敞口、净敞口、单标的集中度。
++- 市场冲击：订单规模越大，越可能推高成交成本。
++- 订单状态：部分成交、撤单失败、券商返回状态延迟或不一致。
+ 
+-**Information Ratio (IR)** focuses on risk-adjusted *abnormal* return, the risk-adjusted alpha!
++当前项目中，`RiskManager` 已覆盖 VaR、流动性、市场冲击、杠杆、敞口和基础行情有效性检查。
+ 
+-α / σ(ε)
++## 绩效评估
+ 
+-(That doesn't tell us how much dollar alpha is there. It can be eaten by transaction costs.)
++仅看最终收益容易误导。更稳妥的做法是同时检查：
+ 
+-**Sharpe Ratio** measures return per unit of risk. Familiar form:
++- 累计 P&L。
++- 最大回撤。
++- 夏普比率。
++- VaR 和 CVaR。
++- 换手率。
++- 交易成本。
++- 胜率和盈亏比。
++- 收益是否集中在少数交易或少数时间段。
+ 
+-E(Rt − rƒ) / σ(Rt − rƒ)
++`PerformanceAnalyzer` 已经提供风险指标、交易成本、换手率、集中度和相对基准表现的计算入口。
+ 
+-## Factors
++## Alpha、Beta 与因子
+ 
+-Evaluating performance **against factors** is the central part of the backtesting.
++Beta 表示策略对市场因子的暴露。Alpha 表示扣除市场因子影响后的超额收益。简单单因子模型可以写成：
+ 
+-We saw the separation of alpha and beta in regression *wrt* one market factor
+-
+-RSt = α + βRMt + εt
+-
+-We see that a `factor` is a time series of changes, similar to the series of asset returns.
+-
+-## Named Factors
+-
+-* **Up Minus Down (UMD)** or **momentum** factor would leverage on stocks that are going up. The recent month's returns are excluded from calculation to avoid a spurious signal.
+-
+-* **Small Minus Big (SMB)** factor shorts large cap stocks, so βSMB measures the tilt towards small stocks.
+-
+-* Long-short **High Minus Low (HML)** or **value** factor: buy top 30% of companies with the high book-to-market value and sell the bottom 30% (expensive stocks).
+-
+-1) Except for HML, the impact/presence of other factors questionable.
+-
+-2) Since 2015, Fama-French moved to 5-factor model that include profitability RMW and investment CMA but ignore the proper 3) Momentum factor and 4) Low Volatility (Betting Against Beta) factors.
+-
+-## Factors Backtesting
+-
+-So how do we check against those factors?
+-
+-Set up a regression!
+-
+-RSt = α + βM RMt + βHML RHMLt + εt
+-
+-where RHMLt is return series from the long-short HML factor.
+-
+-* We can **add factors** to this regression.
+-
+-* We can have **rolling estimates** of these betas for each day/week.
+-
+-## Factors Backtesting (Advanced)
+-
+-* Scale returns to have the same volatility as the benchmark – put on the same plot for correct comparison.
+-
+-* Rolling Sharpe Ratio – changes **not** desirable).
+-
+-* Rolling market factor beta – β > 1 **not** desirable.
+-
+-* Rolling betas *wrt* to UMD (momentum), SMB, and industry sectors.
+-
+-## Drawdowns
+-
+-The drawdown is the cumulative percentage loss, given the loss in the initial timestep.
+-
+-Let's define the highest past peak performance as High Water Mark
+-
+-DDt = (HWMt - Pt) / HWMt
+-
+-where Pt is the cumulative return (or portfolio value Πt).
+-
+-It makes sense to evaluate a maximum drawdown over past period maxt≤T DDt.
+-
+-## Drawdown Control
+-
+-The strategy must be able to survive without running into a close-out.
++```text
++R_S,t = α + βR_M,t + ε_t
++```
+ 
+-It makes sense to pre-define Maximum Acceptable Drawdown (MADD) and trace
++如果要把策略收益拆成市场、价值、规模、动量等来源，可以扩展为多因子回归：
+ 
+-VaRt ≤ MADD – DDt
++```text
++R_S,t = α + β_M R_M,t + β_HML R_HML,t + ε_t
++```
+ 
+-where VaRt is today's VaR and DDt is current drawdown.
++常见因子包括：
+ 
+-## Backtesting for Risk and Liquidity
++- UMD：动量因子。
++- SMB：小盘减大盘因子。
++- HML：价值因子。
++- RMW：盈利能力因子。
++- CMA：投资风格因子。
+ 
+-1. Does cumulative P&L behave as expected (eg, for a coint pair trade)? Behavior of risk measures (volatility/VaR/Drawdown)?
++本项目当前没有内置因子回归模块。如果后续要做策略归因，可以在 `PerformanceAnalyzer` 或新模块中加入滚动 beta、信息比率和多因子回归。
+ 
+-2. Is P&L coming from a few large trades or many smaller trades? Does all profit come from a particular period. Concentration in assets and its attribution - as intended?
++## 回撤与风险预算
+ 
+-3. Turnover - good or bad for your stat arb/algo strat/allocation? Impact of transaction costs (slippage). Plot P&L value (or alpha) vs. Ntransactions.
++回撤可以用历史高水位与当前组合价值计算：
+ 
+-## Python Ecosystem
++```text
++DD_t = （HWM_t − P_t）/ HWM_t
++```
+ 
+-### The Quant Finance PyData Stack
++其中 `HWM_t` 是截至当前时点的历史最高组合价值，`P_t` 是当前组合价值。策略设计时可以预先设定最大可接受回撤，并把当日 VaR 与当前回撤一起纳入风险预算。
+ 
+-Source: [Jake VanderPlas: State of the Tools](https://www.youtube.com/watch?v=5GINDD7qbP4)
++## Python 生态
+ 
+-Github examples below might be no longer updated. Given to showcase the useful elements of systematic backtesting: **a.** rolling beta *wrt* S&P500 plot, **b.** rolling Sharpe Ratio, and **c.** various ratios in scorecards.
++可参考的工具方向：
+ 
+-1. `github.com/quantopian/ALPHALENS`
+-    `github.com/quantopian/alphalens/blob/master/alphalens/examples/alphalens_tutorial_on_quantopian.ipynb`
++- `pandas` 与 `numpy`：数据处理和数值计算。
++- `backtrader`：事件驱动回测。
++- `matplotlib`：图表输出。
++- `streamlit`：仪表盘。
++- `sqlalchemy`：数据库访问。
++- `pyfolio-reloaded`：绩效 tear sheet 思路参考。
+ 
+-2. `github.com/quantopian/PYFOLIO`
+-    `quantopian.github.io/pyfolio/notebooks/single_stock_example/`
++第三方库能节省时间，但策略逻辑、数据质量和交易假设仍然要自己解释清楚。复制一堆库调用并不会自动变成研究，最多变成一份会运行的迷信仪式。
+Only in /mnt/data/intraday_work/intraday-trader-air-main/docs: current_project_overview.md
+diff -ru /mnt/data/original_project/intraday-trader-air-main/docs/exam_guidelines.md /mnt/data/intraday_work/intraday-trader-air-main/docs/exam_guidelines.md
+--- /mnt/data/original_project/intraday-trader-air-main/docs/exam_guidelines.md	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/docs/exam_guidelines.md	2026-06-21 01:51:13.725182583 +0000
+@@ -1,67 +1,38 @@
+-# January 2025 - Final Project
++# 2025 年 1 月最终项目考试说明归档
+ 
+-> **课堂参考**：以下内容保留原课程作业的考试说明，仅作为历史背景供项目参与者参考，并不代表当前仓库的项目规范或贡献要求。
++> 课程资料归档：本文只保留课程考试背景，方便理解本仓库最初的项目来源。当前仓库的开发、测试和提交规范以 `README.md` 与 `AGENTS.md` 为准。
+ 
+-> [!NOTE]
+->
+-> You are about to start the Certificate in Quantitative Finance (CQF) exam. By accessing the exam materials, you acknowledge and agree to the CQF Terms of Use (<https://www.fitch.group/terms-of-use/> en) and the following terms:
+->
+-> - Fitch Learning Limited ("Fitch Learning") holds ownership or licenses for all intellectual property rights related to the <www.cqf.com> website and any content available on the website and the exam, including text, graphics, software, photographs, images, videos, sound, trademarks, and logos (the "CQF Materials").
+-> - By clicking "Start Assignment," you consent not to infringe upon Fitch Learning's intellectual property rights. You agree not to copy, modify, reproduce, publish, sell, upload, broadcast, post, transmit, license, distribute, adapt, merge, translate, decompile, or reverse engineer any part of the CQF Materials without Fitch Learning's written consent.
+-> - Fitch Learning reserves the right to take action against any unauthorized use of the CQF Materials in the event of a breach of these terms. This may include, but is not limited to: (i) disabling and terminating your account; (ii) requesting you to remove materials that breach these terms; and/or (iii) commencing legal proceedings to protect Fitch Learning's or its licensors' intellectual property rights.
++## 考试材料与诚信要求
+ 
+-Please read the following instructions carefully.
++课程说明强调，考试材料受课程平台和版权方条款保护。学生需要遵守平台的使用规则，不得未经许可复制、传播、改写、出售或公开发布考试材料。
+ 
+-**ONLY SUBMIT YOUR FINAL VERSION OF THE EXAM ONTO THE PORTAL ONCE READY.**
++如果需要澄清题目，应通过课程平台的支持渠道提交问题。导师通常不会重新讲解计算过程，也不会确认具体数值答案是否正确。
+ 
+-Clarifying questions should be raised through a support ticket. You can find the "Support" button on your learning portal. Please note, the tutor is unable to re-explain calculation or confirm correct numerical answers or required sections.
++## 提交时间与成绩
+ 
+-[DOWNLOAD JANUARY 2025 FINAL PROJECT BRIEF ⇩](https://www.google.com/search?q=DOWNLOAD+JANUARY+2025+FINAL+PROJECT+BRIEF)
++原课程说明中的关键安排：
+ 
+-[DOWNLOAD JANUARY 2025 FINAL PROJECT DECLARATION ⇩](https://www.google.com/search?q=DOWNLOAD+JANUARY+2025+FINAL+PROJECT+DECLARATION)
++- 项目提交截止时间为 2025 年 8 月 21 日 23:59（英国夏令时）。
++- 项目结果计划于 2025 年 11 月 13 日发布。
++- 通过分数线为 60%。
+ 
+-Submission date for the project is **Thursday 21st August 2025, 23.59 (BST)**. Please note, the project results will be made available **Thursday 13th November 2025**.
++这些日期只对原课程有效，不约束当前代码仓库。
+ 
+-The pass mark for this exam is 60%.
++## 项目题目方向
+ 
+-## How to Submit Your Answer
++课程提供多个项目方向，包括：
+ 
+-Please refer to the [JANUARY 2025 FINAL PROJECT BRIEF ⇩](https://www.google.com/search?q=JANUARY+2025+FINAL+PROJECT+BRIEF) for instructions on how to submit your answer.
++1. 篮子产品信用利差。
++2. 深度学习资产预测。
++3. 配对交易策略设计与回测。
++4. Black-Litterman 与因子组合构建。
++5. 高级数据建模下的最优对冲。
++6. 分类模型的集成学习。
++7. 均值回归与趋势跟随算法交易。
++8. 高维 PDE 的深度神经网络求解。
+ 
+-## Extensions
++本仓库对应第 7 类：均值回归与趋势跟随算法交易。
+ 
+-Absolutely no extensions will be accepted, any delegate who fails to hand in their work will be deferred with no exceptions.
++## 与当前仓库的关系
+ 
+-## Project Options
+-
+-To complete the project, you must code the model(s) and its numerical techniques from **one** topic from the below options and write an analytical report. If you continue from a previous cohort, please review topic description because tasks are regularly reviewed. It is not possible to submit past topics.
+-
+-1. **Credit Spread for a Basket Product (CR)**
+-
+-2. **Deep Learning for Asset Prediction (DL)**
+-
+-3. **Pairs Trading Strategy Design & Back-test (TS)**
+-
+-4. **Portfolio Construction using Black-Litterman Model and Factors (PC)**
+-
+-5. **Optimal Hedging with Advanced Data Modelling (DH)**
+-
+-6. **Blending Ensemble for Classification (ML)**
+-
+-7. **Algorithmic Trading for Reversion and Trend-Following (AL)**
+-
+-8. **Deep Neural Networks for Solving High Dimensional PDEs in Quantitative Finance (DeepPDE) (DN)**
+-
+-## Supporting Workshop and Tutorial Dates
+-
+-- **05/07/2025** - Final Project Workshop I (CR, PC & DH) - **13:00–16:30 BST**
+-
+-- **12/07/2025** - Final Project Workshop II (TS, DL, ML, AL, DN & DH) - **13:00–16:30 BST**
+-
+-- **21/07/2025** - Final Project Tutorial I (PC & DN Topic) - **18:00–20:00 BST**
+-
+-- **22/07/2025** - Final Project Tutorial III (DL & ML Topic) - **18:00–19:00 BST**
+-
+-- **23/07/2025** - Final Project Tutorial IV (TS, DH & AL Topic) - **18:00–19:00 BST**
+-
+-- **24/07/2025** - Final Project Tutorial I (CR Topic) - **18:00–19:00 BST**
++原考试说明属于课程背景材料，当前仓库已经演化为一个 Python 项目。维护时请按当前项目事实更新文档和测试，不要把课程提交规则当作仓库贡献规则。课程文档保留在 `docs/` 中，用于解释研究背景和需求来源。
+diff -ru /mnt/data/original_project/intraday-trader-air-main/docs/general_requirements.md /mnt/data/intraday_work/intraday-trader-air-main/docs/general_requirements.md
+--- /mnt/data/original_project/intraday-trader-air-main/docs/general_requirements.md	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/docs/general_requirements.md	2026-06-21 01:51:24.462361227 +0000
+@@ -1,96 +1,64 @@
+-# CQF FINAL PROJECTS
++# CQF 最终项目通用要求归档
+ 
+-> **课堂参考**：本文档来源于课堂作业，仅作参考；实际项目流程与贡献指南以仓库 README 为准。
++> 课程资料归档：本文整理自课程项目通用要求。当前仓库的实际运行方式、测试方式和贡献流程以 `README.md` 与 `AGENTS.md` 为准。
+ 
+-*by Dr Richard Diamond, PhD CQF ARPM*
++## 准备工作
+ 
+-## Preparation
++课程建议先阅读最终项目 brief、关键阅读材料和补充文件，再收集所需数据。数据来源应与题目匹配，例如股票数据可以使用公开行情源，也可以在合理假设下生成合成数据。
+ 
+-* Start with FP brief, Key Readings and collecting necessary data.
+-  * *Additional Material*
+-  * Use data sources named for each topic, e.g., yfinance for equities data.
+-  * Make reasonable assumptions and generate synthetic data. It is up to you to source data and decide on features based on guidance provided.
+-    * *spreads, rates, IVs.*
+-  * Topic CR, assume hypothetical CDS spreads and compute Corr from equity returns.
+-    * *TDS Web.*
++开始写代码前，应先规划研究设计：
+ 
+-* Plan your own course of implementation/study design. Make simple flowcharts and lists.
+-  * Refer to CQF Lectures. On DL/ML/DN topics in particular do extra reading on methods.
++- 明确研究问题。
++- 画出简短流程图。
++- 列出需要实现的模型和数值方法。
++- 说明数据来源、特征和关键假设。
++- 对深度学习、机器学习或高维 PDE 题目补充阅读方法论文。
+ 
+-## Code Adoption
++## 代码使用原则
+ 
+-A. You can adopt code for specific tasks, but not to submit a scripted coded solution or slightly changed CQF Python Lab code. Amend code for your purpose, not copy/paste.
++课程允许参考已有代码完成特定任务，但不允许直接提交课堂实验代码或只做轻微修改。可以复用成熟库，也可以从原理实现关键方法。判断标准是：核心模型、关键数值技术和研究结论必须能解释清楚。
+ 
+-B. Where pricing or techniques maths is given – that signals to implement from the first principles. Where computation is overly elaborate: quant judgement to use ready libraries. Typically is where optimisation involved.
++适合自己实现的内容：
+ 
+-* *RNN or Convolution CNN-LSTM*
++- 定价公式。
++- Black-Litterman 公式。
++- SDE Monte Carlo 离散格式。
++- 矩阵形式回归。
++- Engle-Granger 检验流程。
++- 插值、Cholesky 分解、t-copula 公式。
++- CDS bootstrap。
++- 特征计算。
+ 
+-C. Welcome to implement complex numerical methods vs. use of ready solution – if able to.
++适合使用成熟库的内容：
+ 
+-* *Num methods in DL are about not over training hyperparams for CNN*
++- 大多数深度学习训练流程。
++- 神经网络参数优化。
++- 多变量协整工具。
++- 核密度估计。
++- 工业级数据处理和可视化工具。
+ 
+-## Numerical Techniques
++## 报告结构
+ 
+-Implement as necessary, numerical techniques from the first principles.
++建议报告包含：
+ 
+-**What to code:** pricing formulae, Black-Litterman formulae, SDE Monte-Carlo schemes, matrix form regression, Engle-Granger, interpolation, Cholesky, t-copula formula, CDS bootstrap, features computation...
++1. 引言：问题定义、研究设计、主要数据和数值技术表。
++2. 模型与方法：数学模型、数值方法、收敛性、精度和计算性质。
++3. 结果与分析：图表、指标、稳健性和敏感性分析。
++4. 结论：模型优缺点、实现限制和改进方向。
+ 
+-**Use ready solutions for:** most of deep learning/classification tasks (eg, don't recode optimisation search for NN coefficients!), low latency RNs, kernel density (obtaining CDF), multivariate cointegration...
++报告不能只堆代码、表格和截图。每个图表都应解释它说明了什么，以及它对结论有什么影响。人类读者通常不具备从随机截图里自动提取意义的超能力，虽然很多报告作者似乎坚信他们有。
+ 
+-* *but correct layering in CNN-LSTM (example)*
++## 运行与复现
+ 
+-* *RNN limitations in regard to time series sequences.*
++代码应模块化、可复现、可测试。若运行方式比较特殊，超出常见 Python、R 或 C++ 流程，需要写清楚安装、配置和执行命令。注释应解释关键逻辑，不需要逐行解释每个变量。
+ 
+-## Project Report
++## 提交要求归档
+ 
+-* **(Ch 1)** Introduction with problem statement, describing design, main data and a coded numerical techniques table.
++原课程要求通常包括：
+ 
+-* **(Ch 2)** As full as possible mathematical description of the models employed as well as numerical methods. Remember accuracy and convergence!
++- 一份最终报告文件。
++- 一份包含代码、声明和辅助文件的压缩包。
++- 文件名应包含项目代码和注册姓名。
++- 不应提交零散脚本文件或泛泛命名的压缩包。
+ 
+-  * *vs. ChX at end, discussing - hyperparam search, Kernel tricks - accuracy, F1scores, epochs / EP.*
+-
+-* **(Ch 3-4 Results | Analysis)** Present results presented using a plenty of tables and figures, which must be interpreted not just thrown at the reader.
+-
+-* **(Ch 5 Conclusions)** Pros and cons of a model and its implementation, together with possible improvements.
+-
+-  * *"say what you have said"*
+-
+-## Project Report (cont)
+-
+-* Demonstrate 'the specials' of your implementation: own research, own coding of complex methods, use of the industrial-strength libraries of C++, Python.
+-
+-* Instructions on how to compile/run, if not common Python/R. The code must be thoroughly tested and well-documented, however no need to over-comment the code.
+-
+-> *Design can be "with code", stemming from IPYNB format*
+-> *But can be .py or .R or .cpp files as project + report.*
+-> *No need to code-annotate each line, each variable.*
+-
+-## The Offering
+-
+-* We will have a look at Topics in the main Project Brief.
+-
+-* **Main Sources:** FP Brief, FP Workshop slides and Additional Files, FP Tutorials and distributed material.
+-
+-* Electives come secondary, one exception is Topic AL Algo Trading. Electives can be watched at the stage of Analysis & Discussion write up.
+-
+-## Submission Instructions
+-
+-*Please follow:*
+-
+-**FILE 1.** It's **absolutely necessary** to name and upload the project report as **ONE file** (pdf or html) with the two-letter project code, followed by your name as **registered** on CQF Portal.
+-
+-* Examples: `TS_John Smith_REPORT.pdf` or `PC_Xiao Wang_REPORT.pdf`
+-
+-* *(Note: `Nbconvert` is written, likely referring to a tool for converting notebooks to other formats).*
+-
+-**FILE 2.** All other files, code and a pdf declaration (if not the front page) have to be uploaded as additional **ONE zip file**, for example `TS_John Smith_CODE.zip`.
+-
+-* No unzipped `.py`, `.cpp` files. No files with generic names, e.g. `CODE.zip`, `FinalProject.zip`.
+-
+-## Final Day
+-
+-**Final Day as FP Brief.**
+-
+-Don't Extend Your Luck!
+-
+-> *There is no standard "extension 2 weeks"*
++这些提交规则只适用于课程平台。当前仓库的贡献方式以 PR、测试结果和代码评审为准。
+diff -ru /mnt/data/original_project/intraday-trader-air-main/docs/general_requirements_2.md /mnt/data/intraday_work/intraday-trader-air-main/docs/general_requirements_2.md
+--- /mnt/data/original_project/intraday-trader-air-main/docs/general_requirements_2.md	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/docs/general_requirements_2.md	2026-06-21 01:51:13.725363040 +0000
+@@ -1,103 +1,51 @@
+-# Final Project Brief
++# 最终项目简报要求归档
+ 
+-> **课堂参考**：本简报保留课堂背景信息，与当前仓库的实际开发流程并无直接绑定，请以 README 与贡献指南为准。
++> 课程资料归档：本文整理自课程简报。它解释项目背景，不直接约束当前仓库的开发流程。
+ 
+-Kannan Singaravelu, CQF
++## 简报主题
+ 
+----
++课程简报主要覆盖：
+ 
+-## In this tutorial
++- 学术诚信。
++- 项目预期。
++- 报告和提交要求。
++- 编程环境和语言限制。
+ 
+-* Academic Integrity Guidelines
++## 学术诚信
+ 
+-* What Is Expected of You
++课程要求所有提交内容必须由学生独立完成，并能解释清楚。直接复制课堂代码、共享脚本或他人内容，会被视为严重问题。报告也不能只展示代码输出和数字，需要包含自己的分析、解释和结论。
+ 
+-* Project Report & Submission Requirements
++原课程还明确限制使用 AI 写作或生成内容完成考试。这个限制属于课程规则。当前仓库的文档和开发协作可以使用工具辅助，但最终提交到课程平台时必须遵守课程平台自己的规定。
+ 
+-* Coding Environment / Language
++## 项目预期
+ 
+----
++合格项目应体现：
+ 
+-## Academic Integrity Guidelines
++- 能理解并解释自己写的代码。
++- 有清楚的数据、方法和结果分析。
++- 有测试用例、图表和稳健性讨论。
++- 能说明模型选择、参数选择和实现局限。
++- 体现独立思考和诚实工作量。
+ 
+-* **Originality is Non-Negotiable**
++## 报告要求
+ 
+-* All work submitted whether for exams or projects must be entirely original.
++报告长度没有固定页数，但内容需要有分析质量。适合包含：
+ 
+-* Submissions showing any signs of duplication, plagiarism, or lack of individual effort will be automatically disqualified.
++- 数学模型。
++- 数值方法。
++- 收敛性、精度和计算成本说明。
++- 图表和测试用例。
++- 与相关研究或经验结果的比较。
++- 稳健性、敏感性和回测分析。
+ 
+-* Submissions will be rejected if they include:
++数学内容可以用 LaTeX 或 Word 公式编辑器完成。
+ 
+-  * directly copied Python code, including from coursework notes and shared scripts
++## 编程环境
+ 
+-  * no explanation, analysis, or evidence of thought process, and
++原课程对部分机器学习和深度学习题目要求使用 Python，并建议模块化、可复现。对于深度学习模型，课程指定使用 TensorFlow 和 Keras API，并限制使用 PyTorch。
+ 
+-  * blind replication of solutions without demonstrating understanding
++这些约束是课程规则。当前仓库的实际依赖以 `pyproject.toml` 为准，核心项目使用 Python 3.10、Backtrader、Pandas、NumPy、SQLAlchemy、Alpaca SDK 和 Streamlit 可选依赖。
+ 
+----
++## 与本仓库的关系
+ 
+-## Academic Integrity Guidelines 2
+-
+-* **Use of ChatGPT, LLM Apps, or AI Writing Tools is Strictly Prohibited**
+-
+-* Any AI-generated content for completing exams or projects is strictly forbidden and will result in automatic disqualification.
+-
+-* Anyone found violating this rule will face disciplinary action, which may include:
+-
+-  * immediate rejection of the submission,
+-
+-  * a grade of zero for the assessment, and
+-
+-  * formal academic misconduct proceedings as per institutional policy
+-
+----
+-
+-## What Is Expected of You
+-
+-* You are required to:
+-
+-  * understand and explain the code you write,
+-
+-  * provide clear analysis, insights, and documentation, and
+-
+-  * show independent thinking and honest effort in all submissions
+-
+-* Submissions that fail to meet these standards will be considered non-serious, unethical, and subject to penalties.
+-
+----
+-
+-## Report & Submission Requirements
+-
+-* Submit working code together with a well-written report and originality declaration.
+-
+-* There is no set page length. Report must have an analytical quality and discussion of results/robustness/sensitivity/backtesting as appropriate to the topic.
+-
+-  * Use charts, test cases and comparison to empirical research papers where available.
+-
+-* Report must contain sufficient mathematical model, numerical methods with attention to their convergence/accuracy/computational properties. Make a table of list down all numerical techniques you coded or used.
+-
+-* Mathematical sections can be prepared using LaTeX or Equation Editor (Word).
+-
+-* Printing out jupyter notebook code and numbers on multiple pages, without your own analysis text, explained plots, relevant maths is not an acceptable format.
+-
+----
+-
+-## Report & Submission Requirements 2
+-
+-### Coding Environment
+-
+-* Use only Python for coding environment / language for both Machine & Deep Learning projects.
+-
+-* Code reproducibility is a must and the use of modular programming approaches is recommended.
+-
+-* Do not recode existing indicators, libraries.
+-
+-* Use only TensorFlow, Keras API for model building.
+-
+-* **Do not use PyTorch.**
+-
+-* Final Project report should be in PDF format ONLY. Supporting and working files like .html, .docx, .ipynb or .py files cannot be construed as the final report.
+-
+-* Submission Requirements: ONLY one zip file should be submitted including the final project report.
+-
+-  * *ML John Smith REPORT.pdf and ML John Smith CODE.zip*
++本仓库的主题对应算法交易方向，已经实现可运行的策略、回测、数据存储、风控和纸上交易联调框架。课程简报可以帮助理解需求来源，但维护项目时应优先参考根目录文档和代码现状。
+diff -ru /mnt/data/original_project/intraday-trader-air-main/docs/project_requirements.md /mnt/data/intraday_work/intraday-trader-air-main/docs/project_requirements.md
+--- /mnt/data/original_project/intraday-trader-air-main/docs/project_requirements.md	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/docs/project_requirements.md	2026-06-21 01:51:13.725105239 +0000
+@@ -1,81 +1,79 @@
+-# Algorithmic Trading for Reversion and Trend-Following v2025
++# 均值回归与趋势跟随算法交易课程要求
+ 
+-> **课堂参考**：本文档系课堂原始项目要求，现存于仓库中仅供灵感参考；落地实现与优先级以主项目规划为准。
++> 课程资料归档：本文整理自 2025 年算法交易课程题目，用来保留项目来源和研究背景。当前仓库的功能、运行方式和贡献规范以 `README.md` 与 `AGENTS.md` 为准。
+ 
+-Algorithmic trading in HFT space is concerned with how to optimally run the core strategies focusing on execution. The issues of order types as allowed by broker/exchange, slippage, incorrect messages from a broker, and own high-frequency data storage (15 Min and less) – can disturb any strategy, and you address them in Part III (last but not the least). However, this is a quantitative study. With attention to mathematics and application detail (e.g., sample period/time window experiment) implement at least two kinds of (a) trend-following strategy with several indicators of your choice AND (b) reversion strategy with an indicator of your choice. This is Part I and you can do it as a historic back-test.
++## 总体目标
+ 
+-In Parts II and III extend the strategies from back-testing to some degree of live-testing to test simple scripts with Broker API of your choice. However, if specific Broker API/language learning curve is steep, you can limit the scope – Part II covers more detail. Real-time trading relies on loops which check for buy/sell signal, and to improve the performance more optimized languages than Python are used in the industry, e.g. GoLang.
++题目要求围绕日内或较高频率数据，研究趋势跟随和均值回归策略。重点包括：
+ 
+-A. The trading code must handle exceptions: failures during the order execution and inconsistent/incorrect information received back from the broker (e.g., order filled when it wasn't, mismatch in order type).
+-B. Trading overall should consider liquidity, market impact, and sudden market events – though you are not likely to be in position to affect the market but consider:
++- 用历史数据完成策略回测。
++- 解释指标、信号和参数选择。
++- 比较不同采样频率、窗口长度和市场状态下的表现。
++- 逐步扩展到接近实盘的 API 联调。
++- 处理订单状态、异常返回、部分成交和数据质量问题。
++- 讨论流动性、市场冲击和突发市场事件。
+ 
+-1. changes in price and volume (market impact, liquidity regime);
++当前仓库已经把这些要求落到以下模块：策略实现位于 `strategies/`，回测入口位于 `backtest/` 和 `scripts/run_backtests.py`，券商接入位于 `broker_handler.py`，风控位于 `risk_manager.py`，一致性检查位于 `consistency_validator.py`。
+ 
+-2. order-specific events, subject to information about execution from API.
++## 第一部分：历史回测
+ 
+-## Trend-Following Strategy
++需要至少实现：
+ 
+-Trend-following strategies aim to capitalize on sustained movements in the market. The indicators such as the Moving Averages, Exponential Moving Averages (EMA) and Average Directional Index (ADX) to confirm trends. The ADX measures the strength of a trend, helping to filter out weak trends that may not be profitable. You can combine moving averages with ADX, in order to generate better quality trading signals.
++1. 一类趋势跟随策略。
++2. 一类均值回归策略。
++3. 清楚说明指标如何计算、信号如何触发、参数如何选择。
++4. 使用历史数据回测，并讨论结果的稳健性。
+ 
+-Experiment with resampling interval and averaging period to assess the effectiveness of your specific trend-following approach. Discuss or better back-test the impact of various market-specific events/liquidity conditions/regime in asset price.
++当前项目中的对应实现：
+ 
+-## Part I: Generic Strategies Made Proprietary
++- `EMACrossoverStrategy`：EMA 短长均线交叉，加 ADX 趋势强度过滤。
++- `CustomRatioStrategy`：价格与长期均线比例策略。
++- `MeanReversionZScoreStrategy`：滚动 Z-Score 均值回归策略。
++- `BuyAndHoldStrategy`：基准策略。
+ 
+-Write code that implements testing on your core strategies, that can be done Python and on historical data (back-testing). Understanding mathematical nuance of indicator, and its back-testing has different purposes, as compared to live-testing which would focus on order slippage, for example. Here, you are not limited to Python, and can use a specialized language + Broker API for Part I as well. There are `Backtrader`, `Zipline`, `PyAlgoTrade` packages but Python doesn't have a ready one solution for our Part I purposes.
++趋势跟随可以使用移动均线、EMA、ADX 或 MACD。均值回归可以使用 Z-Score、OU 过程或其他距离度量。项目当前使用 Z-Score 作为主要均值回归信号，并支持用过滤后的价格序列生成信号。
+ 
+-1. For a core trend-following strategy type, common choices are Exponential Moving Average (EMA) and Average Directional Index (ADX), which is a kind of oscillator. Other approach is a convergence/divergence indicator, Moving Average Convergence/Divergence (MACD). For each strategy, you need to decide on: your own indicator, how it is computed, and what constitutes a trading signal (e.g., crossover of 20D EMA with another).
++## 第二部分：Broker API 与输入数据
+ 
+-2. Simple but practical trend indicator primarily used in FX is of the following design:
++课程要求使用更接近真实交易的数据源和 API，例如 Alpaca、Interactive Brokers 或 Oanda。即使只做历史回测，也应加入数据质量检查，尤其是 15 分钟或更高频率数据。
+ 
+-    * **Step 1:** resample the prices at regular intervals (eg, 30 seconds) for price level or average; Can use `DataFrame.resample`;
++当前项目已经实现：
+ 
+-    * **Step 2:** calculate an average price over the longer period (eg, 5-minute intervals).
++- Alpaca 历史行情拉取。
++- Alpaca REST 账户、订单、持仓接口封装。
++- Alpaca WebSocket 行情和订单更新订阅。
++- 数据质量报告，包括时间戳、缺失 bar、空值和价格跳变检查。
++- `trade_count` 与 `vwap` 的字段回补入口。
+ 
+-    * **Step 3:** compute the ratio of short-term price (or its average) to long-term average price: near 1 signals 'no trend' as short-term prices ≈ the long-term prices. Uptrend is signaled by the ratio above 1, and downtrend by less than 1. Give several calibrations.
++REST API 适合账户查询、历史数据、普通下单和订单状态查询。FIX API 更适合低延迟机构交易，但本仓库当前没有接入 FIX。
+ 
+-    Full mathematical description of indicators chosen and your calibration: experiment with the ratios over different timeframes, frequency.
++## 第三部分：风险与多重测试
+ 
+-3. For a mean-reversion strategy type,
+-    * Z* deviation from the price can be used as a simple signal. Or think about distance measures from machine learning.
++课程要求关注市场风险、订单处理风险和系统运行风险。当前仓库的对应能力包括：
+ 
+-    * Formal modeling of mean-reversion with OU process can be invoked expecting the price to mean-revert over short-time.
++- `RiskManager`：检查 VaR、流动性、点差、市场冲击、杠杆、敞口和行情有效性。
++- `ExceptionHandler`：提供重试、熔断和错误记录。
++- `ConsistencyValidator`：比较信号、成交和绩效是否一致。
++- `no_fill_test_mode`：提交远离市场价格的测试单，并在指定时间后撤单。
++- `DBHandler`：保存行情、交易日志和绩效快照。
++- `dashboard_app.py`：展示绩效快照和交易记录。
+ 
+-    * **OPTIONAL** To generate a stable P&L from reversion strategy, it's very likely some kind of filtering needs to be applied to the price (see Topic TS).
++仍需改进的地方：
+ 
+-4. Discussion. Consider the behaviour of the non-stationary price (regime): for example, would the upward trend with more jumps and volatility produce better/worse returns for a mean-reversion?
++- 实盘命令行入口默认还没有接入 `DBHandler`。
++- 停止交易时的最终报告函数尚未实现。
++- 真实撮合延迟、交易所费用、订单簿深度和断路器仍未建模。
+ 
+-## Part II: Broker API and Input data
++## 报告建议
+ 
+-1. Treat this project as more professional, eg, even for a historical back-testing fetch data from OpenBB/brokerage (vs Yahoo!Finance) and write a couple of routines checking data quality. You are encouraged to work with 15-minute and higher-frequency data.
++如果基于该项目写研究报告，可以采用以下结构：
+ 
+-2. The common API choice is REST (Representational State Transfer).
+-    * Alpaca, Interactive Brokers Web, and Oanda all have their own versions. In particular, Alpaca REST API is free and includes asynchronous events handling based on WebSocket and Server Side Events (SSE).
+-    * REST API is referred to as HTTP API because it utilizes HTTP methods, eg `GET` (retrieve data), `POST` (create new data), `PUT` (update data). Useable for non-time-critical operations such as retrieving historical data, account information, placing orders, and getting order status.
++1. 问题定义：交易标的、频率、数据来源、交易假设。
++2. 方法：指标公式、策略规则、参数范围和风控约束。
++3. 数据：样本区间、缺失处理、复权方式和质量检查。
++4. 回测结果：收益、回撤、夏普、VaR、CVaR、换手率和交易成本。
++5. 稳健性：不同窗口、不同频率、不同市场状态的比较。
++6. 实盘联调：订单状态、异常处理、撤单和一致性验证。
++7. 局限与改进：多标的、交易成本、延迟、行情源和部署方式。
+ 
+-3. The more industrial strength and lower latency API choice is FIX (Financial Information eXchange). A messaging protocol designed for the **real-time** exchange of securities transactions. It supports submission and cancellation of various order types, trade execution reports, and market data dissemination – all for high frequency. FIX is used by large institutions, funds, and broker/dealers.
+-
+-4. Interactive Brokers offer TWS API with connection to their client application and possibility to use `C++`, `C#`, `Java`, `Python`. A useful comparison at [www.interactivebrokers.com/en/index.php?f=5041](https://www.interactivebrokers.com/en/index.php?f=5041).
+-
+-Describe order types suitable to your tickers and strategies, and attempt code for order loops and order handling using an API. Set price parameters far from the market to avoid execution. Though, it is absolutely recommended that you do not run any actual live-trading.
+-
+-## Part III: Evaluate Risk and Test Thrice
+-
+-An opened market position is exposed to various types of risk. While the market risk can be managed with quant methods like rolling VaR, order-handling risk is more important and reliant on API choices (Part II) as well as dev environment and stack of libraries choices.
+-
+-1. Containerize and consider docker and cron-style scheduling (think how different parts of your code can be scheduled to run as an independent scripts). Consider implications for running the image of your code data collection, back-test, and trading order loops on a virtual server.
+-
+-2. Positions Tracking. Code can request account updates (eg, in loop) to provide a secondary confirmation layer.
+-
+-    * Code must have a **verification** of server responses. From the broker side orders may be partially filled and/or returned with an incorrect fill information (e.g., ticker not bought when it was actually bought).
+-
+-    * Catch the stale websockets and connection issues.
+-
+-3. Performance and Risk Reporting. Of less utility to algotrading are `Pyfolio`-style systematic back-testing, scorecards with concentration in asset vs portfolio, Beta-to-SPY. However, do report on P&L performance, turnover, trading costs, and strategy-specific drawdown.
+-
+-    * One recipe but not mandatory is to present a risk dashboard: run a strategy alike to live for N trading days; save fills and P&L in `TimescaleDB` (your own database); display drawdown, Sharpe, intraday VaR. You can try `Streamlit`.
+-
+-4. Market Data. Introduce simple checks to catch inconsistencies in market data (downloaded for a back-test or received from the broker live). For example, futures price can't be below spot price, implied quantities can't be negative.
+-
+----
+-
+-**The general principle is to preserve the trading capital as much as possible.**
++原则很简单：先保住本金，再谈收益。人类金融史已经反复证明，反过来做通常会收获一堆昂贵的教训。
+Only in /mnt/data/intraday_work/intraday-trader-air-main: output
+diff -ru /mnt/data/original_project/intraday-trader-air-main/src/intraday_trader_air/cli.py /mnt/data/intraday_work/intraday-trader-air-main/src/intraday_trader_air/cli.py
+--- /mnt/data/original_project/intraday-trader-air-main/src/intraday_trader_air/cli.py	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/src/intraday_trader_air/cli.py	2026-06-21 01:52:13.942568133 +0000
+@@ -4,6 +4,7 @@
+ 
+ import argparse
+ import importlib
++import sys
+ from collections.abc import Callable, Sequence
+ 
+ _BACKTEST_COMMANDS = {
+@@ -55,15 +56,11 @@
+     )
+     backtest_subparsers = backtest_parser.add_subparsers(dest="backtest_command")
+ 
+-    for name, target in _BACKTEST_COMMANDS.items():
+-        sub = backtest_subparsers.add_parser(name, add_help=False)
+-        sub.add_argument("args", nargs=argparse.REMAINDER)
+-        sub.set_defaults(target=target)
+-
+-    for name, target in _SIMPLE_COMMANDS.items():
+-        simple = subparsers.add_parser(name, add_help=False)
+-        simple.add_argument("args", nargs=argparse.REMAINDER)
+-        simple.set_defaults(target=target)
++    for name in _BACKTEST_COMMANDS:
++        backtest_subparsers.add_parser(name, add_help=False)
++
++    for name in _SIMPLE_COMMANDS:
++        subparsers.add_parser(name, add_help=False)
+ 
+     data_parser = subparsers.add_parser(
+         "data",
+@@ -71,26 +68,75 @@
+     )
+     data_subparsers = data_parser.add_subparsers(dest="data_command")
+ 
+-    for name, target in _DATA_COMMANDS.items():
+-        sub = data_subparsers.add_parser(name, add_help=False)
+-        sub.add_argument("args", nargs=argparse.REMAINDER)
+-        sub.set_defaults(target=target)
++    for name in _DATA_COMMANDS:
++        data_subparsers.add_parser(name, add_help=False)
+ 
+     return parser
+ 
+ 
++def _available(mapping: dict[str, str]) -> str:
++    return ", ".join(sorted(mapping))
++
++
++def _resolve_command(argv: Sequence[str]) -> tuple[str, list[str]]:
++    """Resolve the top-level command and preserve all child command options."""
++
++    if not argv:
++        raise CommandNotFoundError("missing command")
++
++    command = argv[0]
++
++    if command == "backtest":
++        if len(argv) < 2:
++            raise CommandNotFoundError(
++                f"missing backtest command. Available: {_available(_BACKTEST_COMMANDS)}"
++            )
++        subcommand = argv[1]
++        target = _BACKTEST_COMMANDS.get(subcommand)
++        if target is None:
++            raise CommandNotFoundError(
++                f"unknown backtest command '{subcommand}'. Available: {_available(_BACKTEST_COMMANDS)}"
++            )
++        return target, list(argv[2:])
++
++    if command == "data":
++        if len(argv) < 2:
++            raise CommandNotFoundError(
++                f"missing data command. Available: {_available(_DATA_COMMANDS)}"
++            )
++        subcommand = argv[1]
++        target = _DATA_COMMANDS.get(subcommand)
++        if target is None:
++            raise CommandNotFoundError(
++                f"unknown data command '{subcommand}'. Available: {_available(_DATA_COMMANDS)}"
++            )
++        return target, list(argv[2:])
++
++    target = _SIMPLE_COMMANDS.get(command)
++    if target is not None:
++        return target, list(argv[1:])
++
++    raise CommandNotFoundError(
++        f"unknown command '{command}'. Available: "
++        f"backtest, data, {_available(_SIMPLE_COMMANDS)}"
++    )
++
++
+ def main(argv: Sequence[str] | None = None) -> int:
+     parser = _build_parser()
+-    parsed = parser.parse_args(argv)
++    args = list(sys.argv[1:] if argv is None else argv)
+ 
+-    target_path = getattr(parsed, "target", None)
+-    if target_path is None:
++    if not args or args[0] in {"-h", "--help"}:
+         parser.print_help()
+         return 0
+ 
++    try:
++        target_path, forwarded_args = _resolve_command(args)
++    except CommandNotFoundError as exc:
++        parser.error(str(exc))
++
+     target = _load_callable(target_path)
+-    args = getattr(parsed, "args", [])
+-    result = target(args)
++    result = target(forwarded_args)
+     return 0 if result is None else int(result)
+ 
+ 
+Only in /mnt/data/intraday_work/intraday-trader-air-main/tests/unit: test_cli.py
+diff -ru /mnt/data/original_project/intraday-trader-air-main/tests/unit/test_db_handler_storage.py /mnt/data/intraday_work/intraday-trader-air-main/tests/unit/test_db_handler_storage.py
+--- /mnt/data/original_project/intraday-trader-air-main/tests/unit/test_db_handler_storage.py	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/tests/unit/test_db_handler_storage.py	2026-06-21 01:52:43.556252835 +0000
+@@ -7,6 +7,16 @@
+ from intraday_trader_air.db_handler import DBHandler
+ 
+ 
++def _parquet_engine_available() -> bool:
++    for module_name in ("pyarrow", "fastparquet"):
++        try:
++            __import__(module_name)
++            return True
++        except ImportError:
++            continue
++    return False
++
++
+ def _sample_dataframe(index):
+     return pd.DataFrame(
+         {
+@@ -62,6 +72,9 @@
+ 
+ 
+ def test_parquet_upsert_deduplicates_rows(tmp_path):
++    if not _parquet_engine_available():
++        pytest.skip("pyarrow or fastparquet is required for parquet storage tests")
++
+     storage_dir = tmp_path / "parquet"
+     handler = DBHandler({"backend": "parquet", "path": storage_dir})
+ 
+diff -ru /mnt/data/original_project/intraday-trader-air-main/tests/unit/test_live_system.py /mnt/data/intraday_work/intraday-trader-air-main/tests/unit/test_live_system.py
+--- /mnt/data/original_project/intraday-trader-air-main/tests/unit/test_live_system.py	2025-10-03 12:27:24.000000000 +0000
++++ /mnt/data/intraday_work/intraday-trader-air-main/tests/unit/test_live_system.py	2026-06-21 01:51:13.725696862 +0000
+@@ -4,6 +4,8 @@
+ import pytest
+ 
+ pytest.importorskip("pytest_asyncio")
++pytest.importorskip("alpaca_trade_api")
++pytest.importorskip("websockets")
+ 
+ from intraday_trader_air.live_components import TradingState
+ from intraday_trader_air.scripts.run_live_trading import EnhancedTradingSystem
+
