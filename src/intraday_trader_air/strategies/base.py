@@ -1,5 +1,7 @@
 """Core building blocks shared across trading strategies."""
 
+# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import logging
