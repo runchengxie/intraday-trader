@@ -16,6 +16,11 @@
       "reportUnknownMemberType": "none",
       "reportAttributeAccessIssue": "none",
       "reportMissingTypeStubs": "none"
+    },
+    {
+      "root": "src/intraday_trader_air/storage",
+      "reportUnknownMemberType": "none",
+      "reportMissingTypeStubs": "none"
     }
   ]
 }

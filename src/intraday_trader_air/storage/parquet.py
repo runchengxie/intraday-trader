@@ -1,7 +1,5 @@
 """File-system Parquet storage for market data, trade logs, and performance snapshots."""
 
-# pyright: reportUnknownMemberType=false
-
 from __future__ import annotations
 
 import logging
