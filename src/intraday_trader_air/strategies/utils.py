@@ -6,9 +6,8 @@ from __future__ import annotations
 
 from typing import Any
 
-import pandas as pd
-
 import backtrader.indicators as btind
+import pandas as pd
 
 
 def compute_zscore(
