@@ -29,7 +29,11 @@ jobs:
         run: uv run ruff check .
 
       - name: Pyright type check
-        run: uv run pyright --project pyrightconfig.json --level error src tests
+        run: |
+          echo "=== pyrightconfig.json ==="
+          cat pyrightconfig.json
+          echo "=== running pyright ==="
+          uv run pyright --project pyrightconfig.json --level error src tests
 
       - name: Run tests
         run: uv run pytest --cov=intraday_trader_air --cov-report=term-missing --cov-fail-under=50
