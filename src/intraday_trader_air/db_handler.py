@@ -1,57 +1,47 @@
+"""Database handler — unified façade over SQL and Parquet backends.
+
+Delegates Parquet operations to ``storage.ParquetStore`` and SQL operations
+to the local SQLAlchemy session machinery.  ORM models are imported from
+``storage.models`` and re-exported for backward compatibility.
+"""
+
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import Column, DateTime, Float, Integer, String, create_engine, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker
+
+from intraday_trader_air.storage.models import (
+    Base,
+    MarketData,
+    PerformanceSnapshot,
+    TradeLog,
+)
+from intraday_trader_air.storage.parquet import ParquetStore
 
 logger = logging.getLogger(__name__)
 
-Base = declarative_base()
-
-
-# --- ORM Models for our tables ---
-class MarketData(Base):
-    __tablename__ = "market_data"
-    timestamp = Column(DateTime, nullable=False, primary_key=True)
-    symbol = Column(String, nullable=False, primary_key=True)
-    open = Column(Float)
-    high = Column(Float)
-    low = Column(Float)
-    close = Column(Float)
-    volume = Column(Float)
-    trade_count = Column(Integer)
-    vwap = Column(Float)
-
-
-class TradeLog(Base):
-    __tablename__ = "trade_logs"
-    timestamp = Column(DateTime, nullable=False, primary_key=True)
-    order_id = Column(String, primary_key=True)
-    symbol = Column(String, nullable=False, index=True)
-    side = Column(String, nullable=False)
-    quantity = Column(Float, nullable=False)
-    price = Column(Float, nullable=False)
-    commission = Column(Float)
-    pnl = Column(Float)
-
-
-class PerformanceSnapshot(Base):
-    __tablename__ = "performance_snapshots"
-    timestamp = Column(DateTime, nullable=False, primary_key=True)
-    portfolio_value = Column(Float, nullable=False)
-    cash = Column(Float, nullable=False)
-
 
 class DBHandler:
-    def __init__(self, db_config: dict):
+    """Unified read / write façade for market data, trade logs, and snapshots.
+
+    Supports three backends selected via ``db_config["backend"]``:
+
+    * ``"sqlite"`` — local SQLite file
+    * ``"postgresql"`` — PostgreSQL with optional TimescaleDB hypertables
+    * ``"parquet"`` — filesystem-only Parquet files (no database required)
+    """
+
+    def __init__(self, db_config: dict) -> None:
         self.backend = db_config.get("backend", "postgresql").lower()
         self.engine = None
         self.Session = None
         self.db_url: str | None = None
-        self.storage_dir: Path | None = None
-        self.sqlite_path: Path | None = None
+        self._parquet: ParquetStore | None = None
 
         self._sqlite_supports_upsert: bool | None = None
         self._sqlite_version: str | None = None
@@ -70,6 +60,7 @@ class DBHandler:
                 db_path = Path.cwd() / db_path
             db_path.parent.mkdir(parents=True, exist_ok=True)
             self.sqlite_path = db_path
+            self.storage_dir = db_path.parent  # backward compat
             self.db_url = f"sqlite:///{db_path}"
             self.engine = create_engine(
                 self.db_url,
@@ -84,8 +75,9 @@ class DBHandler:
             storage_path = Path(storage_path).expanduser()
             if not storage_path.is_absolute():
                 storage_path = Path.cwd() / storage_path
-            storage_path.mkdir(parents=True, exist_ok=True)
-            self.storage_dir = storage_path
+            self._parquet = ParquetStore(storage_path)
+            self.storage_dir = storage_path  # backward compat — tests may read this
+            self.sqlite_path = None  # backward compat — tests may read this
         else:
             raise ValueError(f"Unsupported database backend: {self.backend}")
 
@@ -98,8 +90,9 @@ class DBHandler:
     # ------------------------------------------------------------------
     # Initialization helpers
     # ------------------------------------------------------------------
-    def initialize_db(self):
-        """Creates tables for SQL backends. File-based backends need no setup."""
+
+    def initialize_db(self) -> None:
+        """Create tables for SQL backends.  Parquet needs no setup."""
         if self.backend == "parquet":
             logger.info(
                 "Parquet backend selected; no database initialization required."
@@ -136,58 +129,40 @@ class DBHandler:
             logger.error("Error initializing database: %s", e, exc_info=True)
             raise
 
-    def _ensure_timescale_hypertables(self):
-        """Convert SQL tables to Timescale hypertables when using PostgreSQL."""
+    def _ensure_timescale_hypertables(self) -> None:
+        """Convert SQL tables to Timescale hypertables (PostgreSQL only)."""
+        hypertables = {
+            "market_data": None,
+            "trade_logs": "INTERVAL '7 days'",
+            "performance_snapshots": "INTERVAL '7 days'",
+        }
         with self.engine.connect() as conn:
-            check_hypertable_sql = text(
-                "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'market_data';"
-            )
-            if not conn.execute(check_hypertable_sql).scalar_one_or_none():
-                conn.execute(
-                    text(
-                        "SELECT create_hypertable('market_data', 'timestamp', if_not_exists => TRUE);"
-                    )
+            for table, chunk_interval in hypertables.items():
+                check = text(
+                    "SELECT 1 FROM timescaledb_information.hypertables "
+                    f"WHERE hypertable_name = '{table}';"
                 )
-                logger.info("'market_data' table converted to a hypertable.")
-            else:
-                logger.info("'market_data' is already a hypertable.")
-
-            check_hypertable_sql_trades = text(
-                "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'trade_logs';"
-            )
-            if not conn.execute(check_hypertable_sql_trades).scalar_one_or_none():
-                conn.execute(
-                    text(
-                        "SELECT create_hypertable('trade_logs', 'timestamp', if_not_exists => TRUE, chunk_time_interval => INTERVAL '7 days');"
+                if not conn.execute(check).scalar_one_or_none():
+                    chunk = (
+                        f", chunk_time_interval => {chunk_interval}"
+                        if chunk_interval
+                        else ""
                     )
-                )
-                logger.info("'trade_logs' table converted to a hypertable.")
-            else:
-                logger.info("'trade_logs' is already a hypertable.")
-
-            check_hypertable_sql_perf = text(
-                "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'performance_snapshots';"
-            )
-            if not conn.execute(check_hypertable_sql_perf).scalar_one_or_none():
-                conn.execute(
-                    text(
-                        "SELECT create_hypertable('performance_snapshots', 'timestamp', if_not_exists => TRUE, chunk_time_interval => INTERVAL '7 days');"
+                    conn.execute(
+                        text(
+                            f"SELECT create_hypertable('{table}', 'timestamp', "
+                            f"if_not_exists => TRUE{chunk});"
+                        )
                     )
-                )
-                logger.info("'performance_snapshots' table converted to a hypertable.")
-            else:
-                logger.info("'performance_snapshots' is already a hypertable.")
-
+                    logger.info("'%s' table converted to a hypertable.", table)
+                else:
+                    logger.info("'%s' is already a hypertable.", table)
             conn.commit()
 
-    def _ensure_market_data_columns(self):
+    def _ensure_market_data_columns(self) -> None:
+        """Add ``trade_count`` and ``vwap`` columns if they don't exist yet."""
         if self.backend == "parquet" or not self.engine:
             return
-
-        required_columns = {
-            "trade_count": "INTEGER",
-            "vwap": "REAL",
-        }
 
         index_statement = text(
             "CREATE INDEX IF NOT EXISTS idx_market_data_symbol_ts "
@@ -211,7 +186,7 @@ class DBHandler:
                     )
                 }
 
-            for column, sql_type in required_columns.items():
+            for column, sql_type in (("trade_count", "INTEGER"), ("vwap", "REAL")):
                 if column not in existing:
                     conn.execute(
                         text(f"ALTER TABLE market_data ADD COLUMN {column} {sql_type};")
@@ -223,10 +198,11 @@ class DBHandler:
             conn.execute(index_statement)
 
     # ------------------------------------------------------------------
-    # Market data helpers
+    # Market data
     # ------------------------------------------------------------------
-    def save_market_data(self, df: pd.DataFrame, symbol: str):
-        """Saves market data to the configured backend."""
+
+    def save_market_data(self, df: pd.DataFrame, symbol: str) -> None:
+        """Persist market data to the configured backend."""
         if df.empty:
             return
 
@@ -235,7 +211,8 @@ class DBHandler:
         df_to_save.index.name = "timestamp"
 
         if self.backend == "parquet":
-            self._save_market_data_parquet(df_to_save)
+            assert self._parquet is not None
+            self._parquet.save_market_data(df_to_save)
             return
 
         df_to_save = df_to_save.reset_index()
@@ -267,17 +244,38 @@ class DBHandler:
             rows_inserted,
         )
 
-    def _detect_sqlite_capabilities(self):
-        """Detect whether the runtime SQLite supports native upsert syntax."""
+    # -- backward-compat internal helpers (used by tests) ----------------
+
+    def _parquet_table_path(self, name: str) -> Path:
+        """Backward-compat: delegate to ParquetStore."""
+        if self._parquet is None:
+            raise RuntimeError(
+                "Parquet backend not configured with a storage directory."
+            )
+        return self._parquet._table_path(name)
+
+    def _load_parquet_table(self, name: str) -> pd.DataFrame:
+        """Backward-compat: delegate to ParquetStore."""
+        if self._parquet is None:
+            return pd.DataFrame()
+        return self._parquet._load_table(name)
+
+    def _write_parquet_table(self, name: str, df: pd.DataFrame) -> None:
+        """Backward-compat: delegate to ParquetStore."""
+        if self._parquet is not None:
+            self._parquet._write_table(name, df)
+
+    def _detect_sqlite_capabilities(self) -> None:
         if self.backend != "sqlite" or not self.engine:
             return
 
         try:
             with self.engine.connect() as conn:
                 version = conn.execute(text("select sqlite_version();")).scalar()
-        except Exception as exc:  # pragma: no cover - defensive logging path
+        except Exception as exc:
             logger.warning(
-                "Could not determine sqlite_version(): falling back to INSERT OR REPLACE. Error: %s",
+                "Could not determine sqlite_version(): falling back to INSERT OR "
+                "REPLACE. Error: %s",
                 exc,
             )
             self._sqlite_supports_upsert = False
@@ -295,7 +293,7 @@ class DBHandler:
 
         if not self._sqlite_supports_upsert:
             logger.info(
-                "SQLite %s lacks native DO UPDATE support; using INSERT OR REPLACE for market_data upserts.",
+                "SQLite %s lacks native DO UPDATE support; using INSERT OR REPLACE.",
                 self._sqlite_version or "unknown version",
             )
 
@@ -303,15 +301,19 @@ class DBHandler:
         if self.backend == "sqlite" and not self._sqlite_supports_upsert:
             return text(
                 f"""
-                INSERT OR REPLACE INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
-                SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name};
+                INSERT OR REPLACE INTO market_data
+                    (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+                SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap
+                FROM {temp_table_name};
                 """
             )
 
         return text(
             f"""
-            INSERT INTO market_data (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
-            SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap FROM {temp_table_name}
+            INSERT INTO market_data
+                (timestamp, symbol, open, high, low, close, volume, trade_count, vwap)
+            SELECT timestamp, symbol, open, high, low, close, volume, trade_count, vwap
+            FROM {temp_table_name}
             ON CONFLICT (timestamp, symbol) DO UPDATE SET
                 open = EXCLUDED.open,
                 high = EXCLUDED.high,
@@ -357,35 +359,20 @@ class DBHandler:
         message = str(exc).lower()
         return "syntax error" in message and "do update" in message
 
-    def _save_market_data_parquet(self, df: pd.DataFrame):
-        path = self._parquet_table_path("market_data")
-        df = df.reset_index()
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-        if "trade_count" not in df.columns:
-            df["trade_count"] = 0
-        if "vwap" not in df.columns:
-            df["vwap"] = None
-        if path.exists():
-            existing = pd.read_parquet(path)
-            existing["timestamp"] = pd.to_datetime(
-                existing["timestamp"], errors="coerce"
-            )
-            combined = pd.concat([existing, df], ignore_index=True)
-            combined.drop_duplicates(
-                subset=["timestamp", "symbol"], keep="last", inplace=True
-            )
-        else:
-            combined = df
-        combined.sort_values(["symbol", "timestamp"], inplace=True)
-        combined.to_parquet(path, index=False)
-        logger.info("Stored %d rows to %s", len(df), path)
+    # ------------------------------------------------------------------
+    # Market data retrieval
+    # ------------------------------------------------------------------
 
     def get_market_data(
         self, symbol: str, start_date: str, end_date: str
     ) -> pd.DataFrame:
-        """Retrieves market data from the configured backend."""
+        """Retrieve market data from the configured backend."""
         if self.backend == "parquet":
-            return self._get_market_data_parquet(symbol, start_date, end_date)
+            assert self._parquet is not None
+            df = self._parquet.get_market_data(symbol)
+            return self._postprocess_market_df(
+                df, start_date=start_date, end_date=end_date
+            )
 
         query = text(
             """
@@ -408,30 +395,18 @@ class DBHandler:
             )
             return pd.DataFrame()
 
-    def _get_market_data_parquet(
-        self, symbol: str, start_date: str, end_date: str
-    ) -> pd.DataFrame:
-        path = self._parquet_table_path("market_data")
-        if not path.exists():
-            return pd.DataFrame()
-        df = pd.read_parquet(path)
-        df = df[df["symbol"] == symbol]
-        return self._postprocess_market_df(df, start_date=start_date, end_date=end_date)
+    # ------------------------------------------------------------------
+    # Trade logs
+    # ------------------------------------------------------------------
 
-    # ------------------------------------------------------------------
-    # Trade log helpers
-    # ------------------------------------------------------------------
     def get_trade_logs(self, start_date, end_date):
+        """Fetch trade logs, returned as ORM objects for SQL, list for parquet."""
         if self.backend == "parquet":
-            df = self._load_parquet_table("trade_logs")
+            assert self._parquet is not None
+            df = self._parquet.read_trade_logs(start_date, end_date)
             if df.empty:
                 return []
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-            mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (
-                df["timestamp"] <= pd.to_datetime(end_date)
-            )
-            filtered = df.loc[mask]
-            return [TradeLog(**row) for row in filtered.to_dict(orient="records")]
+            return [TradeLog(**row) for row in df.to_dict(orient="records")]
 
         session = self.Session()
         try:
@@ -449,19 +424,67 @@ class DBHandler:
         finally:
             session.close()
 
-    def get_performance_snapshots(self, start_date, end_date):
+    def get_trade_logs_as_df(self, start_date, end_date) -> pd.DataFrame:
+        """Fetch trade logs as a pandas DataFrame."""
         if self.backend == "parquet":
-            df = self._load_parquet_table("performance_snapshots")
+            assert self._parquet is not None
+            return self._parquet.read_trade_logs(start_date, end_date)
+
+        query = text(
+            "SELECT * FROM trade_logs WHERE timestamp BETWEEN :start AND :end "
+            "ORDER BY timestamp DESC"
+        )
+        try:
+            with self.engine.connect() as conn:
+                df = pd.read_sql(
+                    query, conn, params={"start": start_date, "end": end_date}
+                )
+            return df
+        except Exception as e:
+            logger.error("Error fetching trade logs as DataFrame: %s", e, exc_info=True)
+            return pd.DataFrame()
+
+    def log_trade_record(self, trade: TradeLog) -> None:
+        """Persist a single trade record."""
+        if self.backend == "parquet":
+            assert self._parquet is not None
+            self._parquet.write_trade_record(
+                {
+                    "timestamp": trade.timestamp,
+                    "order_id": trade.order_id,
+                    "symbol": trade.symbol,
+                    "side": trade.side,
+                    "quantity": trade.quantity,
+                    "price": trade.price,
+                    "commission": trade.commission,
+                    "pnl": trade.pnl,
+                }
+            )
+            return
+
+        session = self.Session()
+        try:
+            session.add(trade)
+            session.commit()
+            logger.info("Logged trade %s for %s.", trade.order_id, trade.symbol)
+        except Exception as e:
+            session.rollback()
+            logger.error("Error logging trade %s: %s", trade.order_id, e, exc_info=True)
+        finally:
+            session.close()
+
+    # ------------------------------------------------------------------
+    # Performance snapshots
+    # ------------------------------------------------------------------
+
+    def get_performance_snapshots(self, start_date, end_date):
+        """Fetch performance snapshots, returned as ORM objects for SQL."""
+        if self.backend == "parquet":
+            assert self._parquet is not None
+            df = self._parquet.read_snapshots(start_date, end_date)
             if df.empty:
                 return []
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-            mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (
-                df["timestamp"] <= pd.to_datetime(end_date)
-            )
-            filtered = df.loc[mask]
-            return [
-                PerformanceSnapshot(**row) for row in filtered.to_dict(orient="records")
-            ]
+            return [PerformanceSnapshot(**row) for row in df.to_dict(orient="records")]
 
         session = self.Session()
         try:
@@ -480,80 +503,15 @@ class DBHandler:
         finally:
             session.close()
 
-    def log_trade_record(self, trade: TradeLog):
-        """Logs a single trade to the backend."""
-        if self.backend == "parquet":
-            df = self._load_parquet_table("trade_logs")
-            trade_dict = {
-                "timestamp": pd.to_datetime(trade.timestamp, utc=True),
-                "order_id": trade.order_id,
-                "symbol": trade.symbol,
-                "side": trade.side,
-                "quantity": trade.quantity,
-                "price": trade.price,
-                "commission": trade.commission,
-                "pnl": trade.pnl,
-            }
-            df = pd.concat([df, pd.DataFrame([trade_dict])], ignore_index=True)
-            df.sort_values("timestamp", inplace=True)
-            self._write_parquet_table("trade_logs", df)
-            logger.info(
-                "Logged trade %s for %s (filesystem backend).",
-                trade.order_id,
-                trade.symbol,
-            )
-            return
-
-        session = self.Session()
-        try:
-            session.add(trade)
-            session.commit()
-            logger.info("Logged trade %s for %s.", trade.order_id, trade.symbol)
-        except Exception as e:
-            session.rollback()
-            logger.error("Error logging trade %s: %s", trade.order_id, e, exc_info=True)
-        finally:
-            session.close()
-
-    def get_trade_logs_as_df(self, start_date, end_date) -> pd.DataFrame:
-        """Fetches trade logs as a pandas DataFrame."""
-        if self.backend == "parquet":
-            df = self._load_parquet_table("trade_logs")
-            if df.empty:
-                return df
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-            mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (
-                df["timestamp"] <= pd.to_datetime(end_date)
-            )
-            return df.loc[mask]
-
-        query = text(
-            "SELECT * FROM trade_logs WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC"
-        )
-        try:
-            with self.engine.connect() as conn:
-                df = pd.read_sql(
-                    query, conn, params={"start": start_date, "end": end_date}
-                )
-            return df
-        except Exception as e:
-            logger.error("Error fetching trade logs as DataFrame: %s", e, exc_info=True)
-            return pd.DataFrame()
-
     def get_performance_snapshots_as_df(self, start_date, end_date) -> pd.DataFrame:
-        """Fetches performance snapshots as a pandas DataFrame."""
+        """Fetch performance snapshots as a pandas DataFrame."""
         if self.backend == "parquet":
-            df = self._load_parquet_table("performance_snapshots")
-            if df.empty:
-                return df
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-            mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (
-                df["timestamp"] <= pd.to_datetime(end_date)
-            )
-            return df.loc[mask]
+            assert self._parquet is not None
+            return self._parquet.read_snapshots(start_date, end_date)
 
         query = text(
-            "SELECT * FROM performance_snapshots WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp ASC"
+            "SELECT * FROM performance_snapshots "
+            "WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp ASC"
         )
         try:
             with self.engine.connect() as conn:
@@ -569,21 +527,16 @@ class DBHandler:
             )
             return pd.DataFrame()
 
-    def log_performance_snapshot(self, snapshot: PerformanceSnapshot):
-        """Logs a portfolio performance snapshot."""
+    def log_performance_snapshot(self, snapshot: PerformanceSnapshot) -> None:
+        """Persist a single performance snapshot."""
         if self.backend == "parquet":
-            df = self._load_parquet_table("performance_snapshots")
-            snapshot_dict = {
-                "timestamp": pd.to_datetime(snapshot.timestamp, utc=True),
-                "portfolio_value": snapshot.portfolio_value,
-                "cash": snapshot.cash,
-            }
-            df = pd.concat([df, pd.DataFrame([snapshot_dict])], ignore_index=True)
-            df.sort_values("timestamp", inplace=True)
-            self._write_parquet_table("performance_snapshots", df)
-            logger.debug(
-                "Logged performance snapshot at %s (filesystem backend).",
-                snapshot.timestamp,
+            assert self._parquet is not None
+            self._parquet.write_snapshot(
+                {
+                    "timestamp": snapshot.timestamp,
+                    "portfolio_value": snapshot.portfolio_value,
+                    "cash": snapshot.cash,
+                }
             )
             return
 
@@ -599,14 +552,16 @@ class DBHandler:
             session.close()
 
     # ------------------------------------------------------------------
-    # Shared helpers
+    # Shared post-processing
     # ------------------------------------------------------------------
+
     def _postprocess_market_df(
         self,
         df: pd.DataFrame,
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> pd.DataFrame:
+        """Normalize index, timezone, and optional date range filter."""
         if df.empty:
             return df
 
@@ -630,9 +585,6 @@ class DBHandler:
                         df.index.name = "timestamp"
                 except Exception:
                     pass
-
-            # Preserve original numeric dtypes to avoid surprises when comparing
-            # against cached DataFrames in tests or downstream analytics.
 
         if start_date or end_date:
             start_ts = pd.Timestamp(start_date) if start_date else None
@@ -658,25 +610,10 @@ class DBHandler:
                 df[column] = pd.NA
         return df
 
-    def _parquet_table_path(self, name: str) -> Path:
-        if not self.storage_dir:
-            raise RuntimeError(
-                "Parquet backend not configured with a storage directory."
-            )
-        return self.storage_dir / f"{name}.parquet"
 
-    def _load_parquet_table(self, name: str) -> pd.DataFrame:
-        path = self._parquet_table_path(name)
-        if not path.exists():
-            return pd.DataFrame()
-        return pd.read_parquet(path)
-
-    def _write_parquet_table(self, name: str, df: pd.DataFrame):
-        path = self._parquet_table_path(name)
-        df.to_parquet(path, index=False)
-
-
-__all__: list[str] = [
+# Re-export for backward compatibility — everything that used to live here.
+__all__ = [
+    "Base",
     "DBHandler",
     "MarketData",
     "PerformanceSnapshot",

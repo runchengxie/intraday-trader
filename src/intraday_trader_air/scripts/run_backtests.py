@@ -73,7 +73,7 @@ def _initialise_runtime(config_path: Path) -> RuntimeContext:
     try:
         config = load_app_config(config_path)
     except ConfigurationError as exc:
-        raise SystemExit(str(exc))
+        raise SystemExit(str(exc)) from exc
 
     ensure_directory(config.paths.output_dir)
     ensure_directory(config.paths.log_dir)

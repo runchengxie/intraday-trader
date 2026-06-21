@@ -1,11 +1,14 @@
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 
+from .analytics.costs import compute_trading_costs, compute_turnover_rate
+from .analytics.relative import compute_relative_performance
+from .analytics.risk import compute_risk_metrics
 from .plotting import plot_from_analyzer
 
 logger = logging.getLogger(__name__)
@@ -164,351 +167,31 @@ class PerformanceAnalyzer:
 
     def calculate_relative_performance(self) -> dict:
         """Calculate relative performance metrics versus the attached benchmark."""
-
         if self.benchmark_returns is None or self.benchmark_returns.empty:
             return {}
-
         portfolio_returns = self.calculate_returns()
-        combined = pd.concat(
-            [
-                portfolio_returns.rename("portfolio"),
-                self.benchmark_returns.rename("benchmark"),
-            ],
-            axis=1,
-            join="inner",
-        ).dropna()
-
-        if combined.empty:
-            return {}
-
-        port = combined["portfolio"]
-        bench = combined["benchmark"]
-
-        bench_var = np.var(bench)
-        beta = np.cov(port, bench)[0, 1] / bench_var if bench_var > 0 else None
-        alpha = port.mean() - (beta * bench.mean() if beta is not None else 0.0)
-        active_returns = port - bench
-        tracking_error = active_returns.std(ddof=1)
-        information_ratio = (
-            active_returns.mean() / tracking_error if tracking_error > 0 else None
+        return compute_relative_performance(
+            portfolio_returns, self.benchmark_returns, self.benchmark_name
         )
-
-        cumulative_port = (1 + port).cumprod()
-        cumulative_bench = (1 + bench).cumprod()
-
-        result = {
-            "benchmark_name": self.benchmark_name,
-            "benchmark_total_return": cumulative_bench.iloc[-1] - 1,
-            "strategy_total_return": cumulative_port.iloc[-1] - 1,
-            "active_return": (cumulative_port.iloc[-1] - cumulative_bench.iloc[-1]),
-            "alpha": alpha,
-            "beta": beta,
-            "tracking_error": tracking_error,
-            "information_ratio": information_ratio,
-        }
-
-        logger.info(
-            "Relative performance vs %s: alpha %.4f, beta %.4f, IR %s",
-            self.benchmark_name,
-            alpha if alpha is not None else float("nan"),
-            beta if beta is not None else float("nan"),
-            f"{information_ratio:.4f}" if information_ratio is not None else "nan",
-        )
-
-        return result
 
     def calculate_turnover_rate(self, period_days: int = 30) -> dict:
-        """
-        Calculates the portfolio turnover rate.
-
-        Args:
-            period_days: The calculation period in days.
-
-        Returns:
-            A dictionary containing the turnover analysis.
-        """
-        if not self.trades:
-            return {"turnover_rate": 0.0, "analysis_period": period_days}
-
-        # Get trades within the specified period
-        trade_window_end = max(trade.timestamp for trade in self.trades)
-        trade_window_start = trade_window_end - timedelta(days=period_days)
-
-        period_trades = [
-            t
-            for t in self.trades
-            if trade_window_start <= t.timestamp <= trade_window_end
-        ]
-
-        if not period_trades:
-            return {"turnover_rate": 0.0, "analysis_period": period_days}
-
-        # Calculate the total value of trades
-        total_traded_value = sum(
-            trade.quantity * trade.price for trade in period_trades
+        """Calculates the portfolio turnover rate."""
+        return compute_turnover_rate(
+            self.trades, self.portfolio_values, self.initial_capital, period_days
         )
-
-        # Calculate the average portfolio value
-        if self.portfolio_values:
-            pv_end = max(timestamp for timestamp, _ in self.portfolio_values)
-            pv_start = pv_end - timedelta(days=period_days)
-            period_portfolio_values = [
-                value
-                for timestamp, value in self.portfolio_values
-                if pv_start <= timestamp <= pv_end
-            ]
-        else:
-            period_portfolio_values = []
-
-        if not period_portfolio_values:
-            avg_portfolio_value = self.initial_capital
-        else:
-            avg_portfolio_value = np.mean(period_portfolio_values)
-
-        # Turnover Rate = Total Traded Value / Average Portfolio Value
-        turnover_rate = (
-            total_traded_value / avg_portfolio_value if avg_portfolio_value > 0 else 0.0
-        )
-
-        # Annualize the turnover rate
-        annualized_turnover = turnover_rate * (365 / period_days)
-
-        result = {
-            "turnover_rate": turnover_rate,
-            "annualized_turnover": annualized_turnover,
-            "total_traded_value": total_traded_value,
-            "avg_portfolio_value": avg_portfolio_value,
-            "analysis_period": period_days,
-            "trade_count": len(period_trades),
-        }
-
-        logger.info(
-            f"Turnover analysis: {turnover_rate:.2%} ({period_days}days), Annualized: {annualized_turnover:.2%}"
-        )
-        return result
 
     def calculate_trading_costs(self) -> dict:
-        """
-        Performs a detailed analysis of trading costs
-        """
-        if not self.trades:
-            return {}
-
-        # Commission costs
-        total_commission = sum(trade.commission for trade in self.trades)
-
-        # Slippage costs
-        total_slippage = sum(
-            abs(trade.slippage) * trade.quantity for trade in self.trades
-        )
-
-        # Market impact costs
-        total_market_impact = sum(
-            abs(trade.market_impact) * trade.quantity for trade in self.trades
-        )
-
-        # Total traded value
-        total_traded_value = sum(trade.quantity * trade.price for trade in self.trades)
-
-        # Cost ratios
-        commission_rate = (
-            total_commission / total_traded_value if total_traded_value > 0 else 0.0
-        )
-        slippage_rate = (
-            total_slippage / total_traded_value if total_traded_value > 0 else 0.0
-        )
-        market_impact_rate = (
-            total_market_impact / total_traded_value if total_traded_value > 0 else 0.0
-        )
-
-        total_cost = total_commission + total_slippage + total_market_impact
-        total_cost_rate = (
-            total_cost / total_traded_value if total_traded_value > 0 else 0.0
-        )
-
-        # Analysis by symbol
-        cost_by_symbol = {}
-        for symbol in set(trade.symbol for trade in self.trades):
-            symbol_trades = [t for t in self.trades if t.symbol == symbol]
-            symbol_commission = sum(t.commission for t in symbol_trades)
-            symbol_slippage = sum(abs(t.slippage) * t.quantity for t in symbol_trades)
-            symbol_market_impact = sum(
-                abs(t.market_impact) * t.quantity for t in symbol_trades
-            )
-            symbol_value = sum(t.quantity * t.price for t in symbol_trades)
-
-            cost_by_symbol[symbol] = {
-                "commission": symbol_commission,
-                "slippage": symbol_slippage,
-                "market_impact": symbol_market_impact,
-                "total_cost": symbol_commission
-                + symbol_slippage
-                + symbol_market_impact,
-                "traded_value": symbol_value,
-                "cost_rate": (
-                    (symbol_commission + symbol_slippage + symbol_market_impact)
-                    / symbol_value
-                    if symbol_value > 0
-                    else 0.0
-                ),
-            }
-
-        result = {
-            "total_commission": total_commission,
-            "total_slippage": total_slippage,
-            "total_market_impact": total_market_impact,
-            "total_cost": total_cost,
-            "total_traded_value": total_traded_value,
-            "commission_rate": commission_rate,
-            "slippage_rate": slippage_rate,
-            "market_impact_rate": market_impact_rate,
-            "total_cost_rate": total_cost_rate,
-            "cost_by_symbol": cost_by_symbol,
-            "trade_count": len(self.trades),
-        }
-
-        logger.info(
-            f"Trading cost analysis: Total cost rate {total_cost_rate:.4%}, Commission {commission_rate:.4%}, Slippage {slippage_rate:.4%}"
-        )
-        return result
+        """Performs a detailed analysis of trading costs."""
+        return compute_trading_costs(self.trades)
 
     def calculate_risk_metrics(self) -> dict:
-        """
-        Calculates risk-adjusted return metrics
-        """
+        """Calculates risk-adjusted return metrics."""
         returns = self.calculate_returns()
-
         if len(returns) < 2:
             return {}
-
-        # Basic statistics
-        total_return = (
-            (self.portfolio_values[-1][1] / self.initial_capital - 1)
-            if self.portfolio_values
-            else 0.0
+        return compute_risk_metrics(
+            returns, self.portfolio_values, self.initial_capital, self.trades
         )
-        annualized_return = (
-            (1 + total_return) ** (252 / len(returns)) - 1 if len(returns) > 0 else 0.0
-        )
-        volatility = returns.std() * np.sqrt(252)
-
-        # Sharpe Ratio
-        risk_free_rate = 0.02  # Assume a 2% annual risk-free rate
-        excess_returns = returns - risk_free_rate / 252
-        sharpe_ratio = (
-            excess_returns.mean() / returns.std() * np.sqrt(252)
-            if returns.std() > 0
-            else 0.0
-        )
-
-        # Maximum Drawdown
-        portfolio_df = pd.DataFrame(
-            self.portfolio_values, columns=["timestamp", "value"]
-        )
-        portfolio_df.set_index("timestamp", inplace=True)
-        cumulative_returns = portfolio_df["value"] / self.initial_capital
-        running_max = cumulative_returns.expanding().max()
-        drawdown = (cumulative_returns - running_max) / running_max
-        max_drawdown = drawdown.min()
-
-        # Calmar Ratio
-        calmar_ratio = (
-            annualized_return / abs(max_drawdown) if max_drawdown != 0 else 0.0
-        )
-
-        # Sortino Ratio
-        downside_returns = returns[returns < 0]
-        downside_deviation = (
-            downside_returns.std() * np.sqrt(252) if len(downside_returns) > 0 else 0.0
-        )
-        sortino_ratio = (
-            (annualized_return - risk_free_rate) / downside_deviation
-            if downside_deviation > 0
-            else 0.0
-        )
-
-        # VaR和CVaR
-        var_95 = np.percentile(returns, 5)
-        cvar_95 = (
-            returns[returns <= var_95].mean()
-            if len(returns[returns <= var_95]) > 0
-            else 0.0
-        )
-
-        # Win rate and profit factor
-        if self.trades:
-            profitable_trades = []
-            losing_trades = []
-
-            # Calculate PnL for closing trades using an average cost basis
-            # Note: This method is primarily suited for long-only strategies
-            positions_tracker = {}
-            for trade in self.trades:
-                symbol = trade.symbol
-                if symbol not in positions_tracker:
-                    positions_tracker[symbol] = {"quantity": 0.0, "cost_basis": 0.0}
-
-                if trade.side == "buy":
-                    old_quantity = positions_tracker[symbol]["quantity"]
-                    old_cost = positions_tracker[symbol]["cost_basis"] * old_quantity
-                    new_cost = trade.quantity * trade.price + trade.commission
-
-                    positions_tracker[symbol]["quantity"] += trade.quantity
-                    if positions_tracker[symbol]["quantity"] > 0:
-                        positions_tracker[symbol]["cost_basis"] = (
-                            old_cost + new_cost
-                        ) / positions_tracker[symbol]["quantity"]
-
-                elif positions_tracker[symbol]["quantity"] > 0:
-                    cost_basis = positions_tracker[symbol]["cost_basis"]
-                    pnl = (trade.price - cost_basis) * trade.quantity - trade.commission
-
-                    if pnl > 0:
-                        profitable_trades.append(pnl)
-                    else:
-                        losing_trades.append(abs(pnl))
-
-                    positions_tracker[symbol]["quantity"] -= trade.quantity
-
-            win_rate = (
-                len(profitable_trades) / (len(profitable_trades) + len(losing_trades))
-                if (len(profitable_trades) + len(losing_trades)) > 0
-                else 0.0
-            )
-            avg_win = np.mean(profitable_trades) if profitable_trades else 0.0
-            avg_loss = np.mean(losing_trades) if losing_trades else 0.0
-            profit_factor = avg_win / avg_loss if avg_loss > 0 else float("inf")
-        else:
-            win_rate = 0.0
-            profit_factor = 0.0
-
-        result = {
-            "total_return": total_return,
-            "annualized_return": annualized_return,
-            "volatility": volatility,
-            "sharpe_ratio": sharpe_ratio,
-            "max_drawdown": max_drawdown,
-            "calmar_ratio": calmar_ratio,
-            "sortino_ratio": sortino_ratio,
-            "var_95": var_95,
-            "cvar_95": cvar_95,
-            "win_rate": win_rate,
-            "profit_factor": profit_factor,
-            "total_trades": len(self.trades),
-            "analysis_period_days": (
-                (
-                    max(trade.timestamp for trade in self.trades)
-                    - min(trade.timestamp for trade in self.trades)
-                ).days
-                if self.trades
-                else 0
-            ),
-        }
-
-        logger.info(
-            f"Risk metrics: Sharpe Ratio {sharpe_ratio:.2f}, Max Drawdown {max_drawdown:.2%}, Win Rate {win_rate:.2%}"
-        )
-        return result
 
     def calculate_concentration_risk(self) -> dict:
         """

@@ -37,7 +37,7 @@ def test_full_backtest_run_with_trades():
     # Use a simple configuration
     params = {"long_ma_period": 50, "sell_threshold": 1.02, "exit_threshold": 1.0}
 
-    cerebro, analysis_results = run_backtest(
+    _, analysis_results = run_backtest(
         BacktestRequest(
             strategy_cls=CustomRatioStrategy,
             data_feed=data_feed,

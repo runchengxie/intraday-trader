@@ -226,7 +226,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         config = load_app_config(args.config)
     except ConfigurationError as exc:
-        raise SystemExit(str(exc))
+        raise SystemExit(str(exc)) from exc
 
     _configure_logging(config)
 

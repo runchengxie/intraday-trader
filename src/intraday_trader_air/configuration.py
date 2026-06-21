@@ -292,7 +292,7 @@ def load_app_config(path: Path) -> AppConfig:
     except KeyError as exc:
         raise ConfigurationError(
             f"Missing required configuration section: {exc.args[0]}"
-        )
+        ) from exc
 
     live_trading = data.get("live_trading")
 

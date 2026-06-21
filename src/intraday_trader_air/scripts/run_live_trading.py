@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 import random
-import signal
 import uuid
 from datetime import datetime, timezone
 
@@ -10,7 +9,6 @@ import numpy as np
 import websockets
 
 from intraday_trader_air.broker_handler import BrokerAPIHandler
-from intraday_trader_air.configuration import load_app_config
 from intraday_trader_air.consistency_validator import ConsistencyValidator
 from intraday_trader_air.exception_handler import (
     ErrorCategory,
@@ -29,6 +27,9 @@ from intraday_trader_air.risk_manager import RiskManager
 
 # Logger will be configured in main() after loading config
 logger = logging.getLogger(__name__)
+
+# Re-export for entry-point backward compatibility (pyproject.toml: run-live)
+from intraday_trader_air.live.session import main  # noqa: F401
 
 
 class EnhancedTradingSystem:
@@ -564,7 +565,7 @@ class EnhancedTradingSystem:
                 )
                 # Schedule automatic cancellation for test orders
                 test_duration = no_fill_config.get("test_duration_seconds", 60)
-                asyncio.create_task(
+                asyncio.create_task(  # noqa: RUF006 — fire-and-forget, handled by auto-cancel
                     self._auto_cancel_test_order(order_result.id, test_duration)
                 )
             else:
@@ -576,7 +577,7 @@ class EnhancedTradingSystem:
 
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(
+                loop.create_task(  # noqa: RUF006 — fire-and-forget, handed to event loop
                     self._post_order_reconciliation(
                         order_result.id,
                         baseline_cash=baseline_cash,
@@ -1080,113 +1081,7 @@ class EnhancedTradingSystem:
             return {"error": str(e)}
 
 
-async def shutdown(sig, loop):
-    """Handle shutdown signals"""
-    signal_name = sig
-    if isinstance(sig, int):
-        try:
-            signal_name = signal.Signals(sig).name
-        except ValueError:
-            signal_name = f"Signal {sig}"
-    elif hasattr(sig, "name"):
-        signal_name = sig.name
-
-    logger.info(f"Received exit signal {signal_name}...")
-
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-
-    if tasks:
-        logger.info(f"Cancelling {len(tasks)} outstanding tasks...")
-        for task in tasks:
-            task.cancel()
-
-        await asyncio.gather(*tasks, return_exceptions=True)
-        logger.info("All outstanding tasks have been processed.")
-    else:
-        logger.info("No other outstanding tasks to cancel.")
-
-
-async def run_trading_session(app_config):
-    """
-    The core asynchronous logic for the live trading session.
-    """
-    # Create trading system
-    trading_system = EnhancedTradingSystem(app_config)
-
-    try:
-        # Start live trading
-        await trading_system.start_live_trading()
-
-    except Exception as e:
-        logger.error(f"Trading system runtime error: {e}")
-        await trading_system.stop_trading()
-
-
-def main():
-    """
-    Main entry point for the live trading script.
-    Sets up the asyncio event loop and runs the trading session.
-    """
-    # 1. First load configuration (using project-standard loader)
-    from pathlib import Path
-
-    app_config_raw = load_app_config(Path("config.yml"))
-
-    # Convert structured AppConfig to dict for backward compatibility
-    # with EnhancedTradingSystem which expects a dict
-    from dataclasses import asdict
-
-    app_config = asdict(app_config_raw)
-
-    # 2. Use loaded configuration to set up logging system
-    log_config = app_config.get("logging", {})
-    log_level = log_config.get("level", "INFO").upper()
-    logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
-        format=log_config.get(
-            "format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        ),
-        datefmt=log_config.get("datefmt", "%Y-%m-%d %H:%M:%S"),
-    )
-
-    # 3. Get logger instance after configuration
-    global logger
-    logger = logging.getLogger(__name__)
-
-    loop = asyncio.get_event_loop()
-
-    try:
-        for sig_val in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(
-                sig_val, lambda s=sig_val: asyncio.create_task(shutdown(s, loop))
-            )
-    except NotImplementedError:
-        logger.info(
-            "loop.add_signal_handler not implemented, falling back to signal.signal (Windows)."
-        )
-        signal.signal(
-            signal.SIGINT, lambda s, f: asyncio.create_task(shutdown(s, loop))
-        )
-        signal.signal(
-            signal.SIGTERM, lambda s, f: asyncio.create_task(shutdown(s, loop))
-        )
-
-    try:
-        loop.run_until_complete(run_trading_session(app_config))
-    except asyncio.CancelledError:
-        logger.info("Main task was cancelled.")
-    finally:
-        logger.info("Cleaning up event loop resources...")
-        pending = asyncio.all_tasks(loop=loop)
-        if pending:
-            logger.info(
-                f"Waiting for {len(pending)} pending tasks to complete before closing loop..."
-            )
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-
-        logger.info("Event loop closed.")
-        loop.close()
-
-
 if __name__ == "__main__":
-    main()
+    from intraday_trader_air.live.session import main as _main
+
+    _main()

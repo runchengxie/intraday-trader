@@ -124,6 +124,36 @@ ignore = [
     "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", # pydocstyle missing docstrings
     "PLR0913",  # Too many arguments — deferred for P2 refactoring
     "PLR0912",  # Too many branches — deferred for P2 refactoring
+    "PLR0915",  # Too many statements — deferred for P2 refactoring
+    "PLR0911",  # Too many return statements — minor
+    "PLR2004",  # Magic value comparisons — P4: extract constants
+    "E501",     # Line too long — P4: line-width reformatting pass
+    "PLC0415",  # Import not at top-level — intentional lazy imports
+    "E402",     # Module-level import not at top — tests use importorskip
+    "DTZ005",   # datetime.now() without tz — P4: timezone audit
+    "DTZ001",   # datetime() without tzinfo — P4: timezone audit
+    "DTZ003",   # datetime.utcnow() — P4: timezone audit
+    "RUF013",   # Implicit Optional — P4: add explicit |None
+    "RET504",   # Unnecessary assignment — minor style
+    "SIM105",   # Use contextlib.suppress — minor style
+    "SIM108",   # Use ternary operator — minor style
+    "SIM102",   # Collapsible if — minor style
+    "RUF001",   # Ambiguous unicode character — intentional
+    "ARG001",   # Unused function argument — P4 cleanup
+    "ARG002",   # Unused method argument — P4 cleanup
+    "ARG005",   # Unused lambda argument — P4 cleanup
+    "UP031",    # Use format specifiers — P4 cleanup
+    "C408",     # Unnecessary dict() call — minor style
+    "PLW0603",  # Global statement — P4 cleanup
+]
+
+# Per-file ignores for test files (stricter rules don't apply)
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "B006",   # Mutable default arguments in test helpers
+    "B012",   # return inside finally in test fixtures
+    "ARG001", # Unused function argument in tests
+    "ARG002", # Unused method argument in tests
 ]
 
 # Specific configuration for the import sorter (isort).
