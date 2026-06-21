@@ -31,6 +31,7 @@ jobs:
       - name: Pyright type check
         run: |
           echo "commit: $(git rev-parse HEAD)"
+          git log --oneline -1
           cat pyrightconfig.json
           uv run pyright --project pyrightconfig.json --level error src
 
