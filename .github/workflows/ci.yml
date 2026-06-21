@@ -31,7 +31,8 @@ jobs:
       - name: Pyright type check
         run: |
           echo "commit: $(git rev-parse HEAD)"
-          uv run pyright --project pyrightconfig.json --level error
+          cat pyrightconfig.json
+          uv run pyright --project pyrightconfig.json --level error src
 
       - name: Run tests
         run: uv run pytest --cov=intraday_trader_air --cov-report=term-missing --cov-fail-under=50
