@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 import typing
 
-import backtrader as bt
+import backtrader as bt  # type: ignore[reportMissingTypeStubs]
 import pytz
-from backtrader.utils.autodict import AutoOrderedDict
-from backtrader.utils.date import num2date
+from backtrader.utils.autodict import AutoOrderedDict  # type: ignore[reportMissingTypeStubs]
+from backtrader.utils.date import num2date  # type: ignore[reportMissingTypeStubs]
 
 STATUS_NAME = {
     bt.Order.Created: "created",
@@ -33,7 +33,7 @@ class OrderLoggerMixin:
     def _bar_dt(self) -> str:
         try:
             ny = pytz.timezone("America/New_York")
-            dt = num2date(self.data.datetime[0], tz=ny)
+            dt = num2date(self.data.datetime[0], tz=ny)  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
             return f"{dt:%Y-%m-%d %H:%M}"
         except Exception:
             return "NA"
