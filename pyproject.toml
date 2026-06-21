@@ -162,3 +162,7 @@ ignore = [
 [tool.ruff.lint.isort]
 # Specify known third-party libraries to help Ruff sort them correctly.
 known-third-party = ["alpaca_trade_api", "backtrader", "matplotlib", "numpy", "pandas", "pytest", "pyyaml", "requests", "streamlit", "sqlalchemy", "seaborn", "scipy"]
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "off"
