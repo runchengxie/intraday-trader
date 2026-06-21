@@ -99,7 +99,7 @@ class CircuitBreaker:
     def __init__(
         self,
         failure_threshold: int = 5,
-        recovery_timeout: int = 60,
+        recovery_timeout: float = 60,
         expected_exception: type[Exception] = Exception,
     ):
         self.failure_threshold = failure_threshold
