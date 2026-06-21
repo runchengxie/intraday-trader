@@ -254,12 +254,12 @@ make coverage
 | 文件 | 内容 |
 | --- | --- |
 | `AGENTS.md` | 仓库协作、测试、代码风格和文档书写约定。 |
-| `docs/current_project_overview.md` | 当前代码能力、测试覆盖和已知技术债说明。 |
-| `docs/project_requirements.md` | 课程中算法交易题目的中文整理。 |
-| `docs/additional_guide.md` | 均值回归、趋势跟随、风险评估和因子分析的补充笔记。 |
-| `docs/general_requirements.md` | 课程项目通用要求的中文整理。 |
-| `docs/general_requirements_2.md` | 课程简报要求的中文整理。 |
-| `docs/exam_guidelines.md` | 课程考试说明归档。 |
+| `docs/current-project-overview.md` | 当前代码能力、测试覆盖和已知技术债说明。 |
+| `docs/project-requirements.md` | 课程中算法交易题目的中文整理。 |
+| `docs/additional-guide.md` | 均值回归、趋势跟随、风险评估和因子分析的补充笔记。 |
+| `docs/general-requirements.md` | 课程项目通用要求的中文整理。 |
+| `docs/general-requirements-2.md` | 课程简报要求的中文整理。 |
+| `docs/exam-guidelines.md` | 课程考试说明归档。 |
 
 ## 项目结构
 
