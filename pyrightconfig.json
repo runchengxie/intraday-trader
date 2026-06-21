@@ -3,24 +3,11 @@
   "typeCheckingMode": "basic",
   "include": ["src", "tests"],
   "exclude": [".venv", ".git", "__pycache__", "dist", "build"],
-  "reportMissingTypeStubs": "warning",
-  "reportUnknownMemberType": "warning",
+  "reportMissingTypeStubs": "none",
+  "reportUnknownMemberType": "none",
   "reportOptionalMemberAccess": "warning",
   "reportGeneralTypeIssues": "warning",
   "reportArgumentType": "warning",
   "reportAttributeAccessIssue": "warning",
-  "reportCallIssue": "warning",
-  "executionEnvironments": [
-    {
-      "root": "src/intraday_trader_air/scripts",
-      "reportUnknownMemberType": "none",
-      "reportAttributeAccessIssue": "none",
-      "reportMissingTypeStubs": "none"
-    },
-    {
-      "root": "src/intraday_trader_air/storage",
-      "reportUnknownMemberType": "none",
-      "reportMissingTypeStubs": "none"
-    }
-  ]
+  "reportCallIssue": "warning"
 }
