@@ -96,6 +96,8 @@ package-dir = {"" = "src"}
 target-version = "py310"
 # Set the line length
 line-length = 88
+# Exclude non-source directories
+exclude = ["project_tools"]
 
 # --- Ruff Formatter Configuration ---
 [tool.ruff.format]
