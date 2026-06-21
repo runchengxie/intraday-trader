@@ -24,6 +24,7 @@ st.title("Algorithmic Trading Performance Dashboard")
 load_dotenv()
 
 # --- Load config and initialize ---
+config = None
 try:
     config = load_app_config(Path("config.yml"))
     db_handler = DBHandler(asdict(config.database) if config.database else {})
@@ -55,7 +56,7 @@ if perf_snapshots.empty:
     st.warning("No performance snapshots found for the selected period.")
 else:
     # --- Calculate metrics using PerformanceAnalyzer ---
-    initial_capital = config.backtest.initial_cash
+    initial_capital = config.backtest.initial_cash  # type: ignore[reportOptionalMemberAccess]
     analyzer = PerformanceAnalyzer(initial_capital)
     risk_manager = RiskManager(risk_config={})
 

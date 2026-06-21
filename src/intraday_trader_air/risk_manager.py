@@ -340,6 +340,8 @@ class RiskManager:
                 from scipy.stats import norm
 
                 var_return = norm.ppf(self.var_confidence, mean_return, std_return)
+            else:
+                var_return = 0.0
 
             var_amount = abs(var_return * portfolio_value)
             rolling_vars.append(var_amount)

@@ -650,6 +650,7 @@ class EnhancedTradingSystem:
         delay = initial_delay
 
         while not self._stop_requested.is_set():
+            trading_loop_task = None
             try:
                 logger.info("Attempting to start data stream...")
                 # Setup stream before each connection attempt
@@ -682,10 +683,10 @@ class EnhancedTradingSystem:
                 )
                 logger.warning(f"Attempting to reconnect in {delay:.2f} seconds...")
             finally:
-                if "trading_loop_task" in locals() and not trading_loop_task.done():
-                    trading_loop_task.cancel()
+                if "trading_loop_task" in locals() and not trading_loop_task.done():  # type: ignore[union-attr]
+                    trading_loop_task.cancel()  # type: ignore[union-attr]
                     try:
-                        await trading_loop_task
+                        await trading_loop_task  # type: ignore[union-attr]
                     except asyncio.CancelledError:
                         pass
                 await self.broker_handler.stop_streaming()
@@ -847,6 +848,7 @@ class EnhancedTradingSystem:
                 )
 
                 signal = None
+                current_price = None
                 if data_type in ["trade", "bar"]:
                     current_price = self.trading_state.last_trade_price
                     if not current_price:
@@ -946,6 +948,7 @@ class EnhancedTradingSystem:
                         logger.info(
                             "All pre-trade risk checks passed. Proceeding with trade execution."
                         )
+                        assert current_price is not None
                         self._execute_trade(signal, current_price)
                     else:
                         all_warnings = (
