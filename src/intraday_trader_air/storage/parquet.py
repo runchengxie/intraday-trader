@@ -6,7 +6,7 @@ import logging
 import typing
 from pathlib import Path
 
-import pandas as pd  # type: ignore[reportMissingTypeStubs]
+import pandas as pd  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,11 @@ class ParquetStore:
         path = self._table_path(name)
         if not path.exists():
             return pd.DataFrame()
-        return pd.read_parquet(path)  # type: ignore[reportUnknownMemberType]
+        return pd.read_parquet(path)  # pyright: ignore[reportUnknownMemberType]
 
     def _write_table(self, name: str, df: pd.DataFrame) -> None:
         path = self._table_path(name)
-        df.to_parquet(path, index=False)
+        df.to_parquet(path, index=False)  # pyright: ignore[reportUnknownMemberType]
 
     # -- market data -----------------------------------------------------
 
@@ -44,14 +44,14 @@ class ParquetStore:
         """Persist a DataFrame of market data rows (must contain ``symbol`` column)."""
         path = self._table_path("market_data")
         df = df.reset_index()
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")  # pyright: ignore[reportUnknownMemberType]
         if "trade_count" not in df.columns:
             df["trade_count"] = 0
         if "vwap" not in df.columns:
             df["vwap"] = None
         if path.exists():
-            existing = pd.read_parquet(path)
-            existing["timestamp"] = pd.to_datetime(
+            existing = pd.read_parquet(path)  # pyright: ignore[reportUnknownMemberType]
+            existing["timestamp"] = pd.to_datetime(  # pyright: ignore[reportUnknownMemberType]
                 existing["timestamp"], errors="coerce"
             )
             combined = pd.concat([existing, df], ignore_index=True)
@@ -60,8 +60,8 @@ class ParquetStore:
             )
         else:
             combined = df
-        combined.sort_values(["symbol", "timestamp"], inplace=True)
-        combined.to_parquet(path, index=False)
+        combined.sort_values(["symbol", "timestamp"], inplace=True)  # pyright: ignore[reportUnknownMemberType]
+        combined.to_parquet(path, index=False)  # pyright: ignore[reportUnknownMemberType]
         logger.info("Stored %d rows to %s", len(df), path)
 
     def get_market_data(
@@ -71,7 +71,7 @@ class ParquetStore:
         path = self._table_path("market_data")
         if not path.exists():
             return pd.DataFrame()
-        df = pd.read_parquet(path)
+        df = pd.read_parquet(path)  # pyright: ignore[reportUnknownMemberType]
         df = typing.cast(pd.DataFrame, df[df["symbol"] == symbol])
         return df
 
@@ -80,14 +80,14 @@ class ParquetStore:
     def write_trade_record(self, record: dict) -> None:
         """Append a single trade record (dict with standard columns)."""
         df = self._load_table("trade_logs")
-        record["timestamp"] = pd.to_datetime(record["timestamp"], utc=True)
+        record["timestamp"] = pd.to_datetime(record["timestamp"], utc=True)  # pyright: ignore[reportUnknownMemberType]
         df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
-        df.sort_values("timestamp", inplace=True)
+        df.sort_values("timestamp", inplace=True)  # pyright: ignore[reportUnknownMemberType]
         self._write_table("trade_logs", df)
         logger.info(
             "Logged trade %s for %s (filesystem backend).",
-            record.get("order_id"),
-            record.get("symbol"),
+            record.get("order_id"),  # pyright: ignore[reportUnknownMemberType]
+            record.get("symbol"),  # pyright: ignore[reportUnknownMemberType]
         )
 
     def read_trade_logs(self, start_date: str, end_date: str) -> pd.DataFrame:
@@ -95,9 +95,9 @@ class ParquetStore:
         df = self._load_table("trade_logs")
         if df.empty:
             return df
-        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-        mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (
-            df["timestamp"] <= pd.to_datetime(end_date)
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")  # pyright: ignore[reportUnknownMemberType]
+        mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (  # pyright: ignore[reportUnknownMemberType]
+            df["timestamp"] <= pd.to_datetime(end_date)  # pyright: ignore[reportUnknownMemberType]
         )
         return df.loc[mask]
 
@@ -106,9 +106,9 @@ class ParquetStore:
     def write_snapshot(self, snapshot: dict) -> None:
         """Append a single performance snapshot (dict with timestamp, portfolio_value, cash)."""
         df = self._load_table("performance_snapshots")
-        snapshot["timestamp"] = pd.to_datetime(snapshot["timestamp"], utc=True)
+        snapshot["timestamp"] = pd.to_datetime(snapshot["timestamp"], utc=True)  # pyright: ignore[reportUnknownMemberType]
         df = pd.concat([df, pd.DataFrame([snapshot])], ignore_index=True)
-        df.sort_values("timestamp", inplace=True)
+        df.sort_values("timestamp", inplace=True)  # pyright: ignore[reportUnknownMemberType]
         self._write_table("performance_snapshots", df)
         logger.debug(
             "Logged performance snapshot at %s (filesystem backend).",
@@ -120,8 +120,8 @@ class ParquetStore:
         df = self._load_table("performance_snapshots")
         if df.empty:
             return df
-        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-        mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (
-            df["timestamp"] <= pd.to_datetime(end_date)
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")  # pyright: ignore[reportUnknownMemberType]
+        mask = (df["timestamp"] >= pd.to_datetime(start_date)) & (  # pyright: ignore[reportUnknownMemberType]
+            df["timestamp"] <= pd.to_datetime(end_date)  # pyright: ignore[reportUnknownMemberType]
         )
         return df.loc[mask]
