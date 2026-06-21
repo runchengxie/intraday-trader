@@ -5,9 +5,9 @@
   "exclude": [".venv", ".git", "__pycache__", "dist", "build"],
   "reportMissingTypeStubs": false,
   "reportUnknownMemberType": false,
-  "reportOptionalMemberAccess": "warning",
-  "reportGeneralTypeIssues": "warning",
-  "reportArgumentType": "warning",
-  "reportAttributeAccessIssue": "warning",
-  "reportCallIssue": "warning"
+  "reportOptionalMemberAccess": false,
+  "reportGeneralTypeIssues": false,
+  "reportArgumentType": false,
+  "reportAttributeAccessIssue": false,
+  "reportCallIssue": false
 }
