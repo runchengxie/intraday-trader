@@ -145,3 +145,54 @@ def run_backtest(request: BacktestRequest) -> tuple[bt.Cerebro, dict[str, Any]] 
         "Turnover (%)": turnover_ratio * 100 if np.isfinite(turnover_ratio) else "N/A",
     }
     return cerebro, analysis_results
+
+
+class BacktestEngine:
+    """Convenience wrapper around ``run_backtest`` / ``BacktestRequest``.
+
+    Preserves the older test-facing API so strategy tests stay readable.
+    """
+
+    def __init__(
+        self,
+        initial_cash: float = 100_000,
+        commission: float = 0.001,
+        slippage: float = 0.001,
+    ) -> None:
+        self._initial_cash = initial_cash
+        self._commission = commission
+        self._slippage = slippage
+        self._data: bt.feeds.PandasData | None = None
+        self._strategy_cls: type | None = None
+        self._strategy_params: dict[str, Any] = {}
+        self.cerebro: bt.Cerebro | None = None
+
+    def setup(
+        self,
+        data: bt.feeds.PandasData,
+        strategy: type,
+        strategy_params: dict[str, Any] | None = None,
+    ) -> None:
+        self._data = data
+        self._strategy_cls = strategy
+        self._strategy_params = dict(strategy_params or {})
+
+    def run(self) -> dict[str, Any]:
+        if self._data is None or self._strategy_cls is None:
+            raise RuntimeError("Call setup() before run()")
+
+        request = BacktestRequest(
+            strategy_cls=self._strategy_cls,
+            data_feed=self._data,
+            initial_cash=self._initial_cash,
+            commission=self._commission,
+            slippage_perc=self._slippage,
+            single_run_params=self._strategy_params,
+        )
+        self.cerebro, analysis = run_backtest(request)
+        return {
+            "sharpe_ratio": analysis.get("Sharpe Ratio"),
+            "total_value": analysis.get("Final Value"),
+            "total_trades": analysis.get("Total Trades"),
+            "initial_value": self._initial_cash,
+        }

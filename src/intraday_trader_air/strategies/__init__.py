@@ -17,12 +17,21 @@ REGISTRY = {
     "BuyAndHoldStrategy": BuyAndHoldStrategy,
 }
 
+BuyAndHold = BuyAndHoldStrategy
+EMACrossover = EMACrossoverStrategy
+MeanReversion = MeanReversionZScoreStrategy
+RatioStrategy = CustomRatioStrategy
+
 __all__ = [
     "REGISTRY",
     "BaseStrategy",
+    "BuyAndHold",
     "BuyAndHoldStrategy",
     "CustomRatioStrategy",
+    "EMACrossover",
     "EMACrossoverStrategy",
+    "MeanReversion",
     "MeanReversionZScoreStrategy",
     "OrderLoggerMixin",
+    "RatioStrategy",
 ]

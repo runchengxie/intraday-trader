@@ -612,5 +612,11 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - legacy
     return 0
 
 
+
+def extend_pandas_data(df: pd.DataFrame) -> bt.feeds.PandasData:
+    """Convert a DataFrame with OHLCV(+vwap+trade_count) to a Backtrader feed."""
+    return bt.feeds.PandasData(dataname=df)
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
