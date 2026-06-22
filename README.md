@@ -138,8 +138,15 @@ flowchart LR
 | --- | --- | --- |
 | `README.md`（本文件） | 项目概貌和快速开始 | 第一次接触项目 |
 | `AGENTS.md` | 协作规范、代码风格、测试要求 | 准备提交代码 |
+| `docs/workflow-cookbook.md` | 端到端操作手册：从环境搭建到实盘交易的每一步命令和预期输出 | 第一次跑通完整流程 |
+| `docs/broker-guide.md` | Alpaca 和富途的接入步骤、环境变量、config 示例和排障 | 配置券商通道 |
+| `docs/strategy-reference.md` | 四类策略的算法伪代码、信号公式、参数含义和适用场景 | 理解策略怎么算 |
+| `docs/metrics-reference.md` | 夏普、最大回撤、VaR、CVaR、换手率等的公式和解读基准 | 看懂回测输出 |
+| `docs/risk-engine.md` | 风控模型的分层检查逻辑、各参数调优思路和扩展方法 | 调优或扩展风控 |
 | `docs/project-manual.md` | 完整能力清单、配置参考、CLI 详解、测试指南、已知技术债 | 深入了解和日常开发 |
 | `docs/design-rationale.md` | 策略选型、风控模型、绩效评估和多券商设计思路 | 理解设计考量 |
+| `docs/docker-guide.md` | Docker profiles、构建、环境变量注入和与本地开发的切换 | 容器化部署 |
+| `docs/streamlit-guide.md` | 仪表盘页面布局、数据来源和扩展方法 | 使用或扩展仪表盘 |
 
 ## 项目结构
 

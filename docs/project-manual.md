@@ -2,7 +2,7 @@
 
 本文是 intraday-trader 的项目说明书，面向新接手项目的开发者。内容包括能力清单、配置参考、CLI 命令详解、测试指南和已知技术债。
 
-阅读顺序建议：先看根目录 `README.md` 了解项目概貌和快速开始，再回到本文深入细节。
+阅读顺序建议：先看根目录 `README.md` 了解项目概貌和快速开始，按 `docs/workflow-cookbook.md` 走一遍完整流程，再回到本文深入细节。按需查阅 `docs/broker-guide.md`、`docs/strategy-reference.md`、`docs/metrics-reference.md`、`docs/risk-engine.md`、`docs/docker-guide.md` 和 `docs/streamlit-guide.md`。
 
 ## 能力清单
 
@@ -313,5 +313,6 @@ make coverage                        # 覆盖率报告
 
 ## 变更记录
 
-- 2026-06-22：文档全面更新。README、AGENTS.md、project-manual 反映多券商适配层（Alpaca + 富途）、多行情源层、执行管线（信号→目标→订单计划→下单）、QEE 执行路由、storage/analytics/live 模块拆分等新增能力。新增 `.env.example` 富途环境变量。
+- 2026-06-22：新增六份实操文档：`broker-guide.md`、`workflow-cookbook.md`、`strategy-reference.md`、`metrics-reference.md`、`docker-guide.md`、`risk-engine.md`、`streamlit-guide.md`。README 和 project-manual 文档导航同步更新。
+- 2026-06-22：文档全面更新。README、AGENTS.md、project-manual 反映多券商适配层（Alpaca + 富途）、多行情源层、执行管线、QEE 执行路由、storage/analytics/live 模块拆分等新增能力。新增 `.env.example` 富途环境变量。
 - 2026-06-21：文档全面中文化，README、AGENTS.md、docs/ 全部翻译并整理。cli.py 重构为显式命令解析。新增 test_cli.py。修复 test_live_system.py 和 test_db_handler_storage.py 的 importorskip 缺失。

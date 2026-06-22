@@ -114,8 +114,15 @@ uv run pytest -m integration
 | --- | --- | --- |
 | `README.md` | 项目入口：介绍、快速开始、架构图、文档导航 | 功能增减或入口命令变化时更新 |
 | `AGENTS.md`（本文件） | 仓库协作规范 | 代码风格、测试要求、提交流程变化时更新 |
+| `docs/workflow-cookbook.md` | 端到端操作手册 | CLI 命令、工作流步骤变化时更新 |
+| `docs/broker-guide.md` | 券商接入指南 | 券商配置、环境变量、排障方法变化时更新 |
+| `docs/strategy-reference.md` | 策略算法参考 | 策略参数、信号逻辑变化时更新 |
+| `docs/metrics-reference.md` | 绩效指标参考 | 指标计算公式或解读基准变化时更新 |
+| `docs/risk-engine.md` | 风控引擎说明 | 风控参数、检查逻辑变化时更新 |
 | `docs/project-manual.md` | 项目说明书：能力清单、配置参考、CLI 详解、测试指南、已知技术债 | 功能、配置、测试覆盖或技术债变化时同步更新 |
 | `docs/design-rationale.md` | 设计思路：策略选型、风控模型、绩效框架和多券商设计的考量 | 架构决策或设计理念变化时更新 |
+| `docs/docker-guide.md` | Docker 使用指南 | Dockerfile、docker-compose 或部署方式变化时更新 |
+| `docs/streamlit-guide.md` | 仪表盘指南 | 仪表盘页面、数据源或扩展方式变化时更新 |
 
 ## 提交与 PR
 
