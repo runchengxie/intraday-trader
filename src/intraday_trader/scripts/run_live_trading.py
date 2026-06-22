@@ -77,6 +77,16 @@ class EnhancedTradingSystem:
         self.performance_monitor_task = None
         self._stop_requested = asyncio.Event()
 
+        # QEE execution backend (lazy, only used when execution.backend == "qee")
+        self.qee_backend = None
+        execution_cfg = live_trading_config.get("execution", {})
+        if isinstance(execution_cfg, dict) and execution_cfg.get("backend") == "qee":
+            from intraday_trader.qee_execution_backend import QEEExecutionBackend
+
+            self.qee_backend = QEEExecutionBackend(
+                config=execution_cfg.get("qee", {})
+            )
+
         logger.info("Enhanced trading system initialization completed")
 
     async def _auto_cancel_test_order(self, order_id: str, delay_seconds: int):
@@ -471,6 +481,36 @@ class EnhancedTradingSystem:
 
         baseline_cash = self.trading_state.last_known_cash
         baseline_position = self.trading_state.current_position_qty
+
+        # --- Route through QEE execution backend when configured ---
+        if self.qee_backend is not None:
+            live_config = self.app_config.get("live_trading", {})
+            strategy_name = live_config.get("strategy", "mean_reversion")
+            default_qty = live_config.get("default_order_qty", 10)
+
+            result = self.qee_backend.execute_signal(
+                signal,
+                symbol=self.trading_state.symbol,
+                market="US",
+                order_qty=default_qty,
+                signal_price=current_price,
+                strategy=strategy_name,
+            )
+            if result.get("error"):
+                logger.error("QEE execution failed: %s", result["error"])
+            elif result.get("executed"):
+                logger.info(
+                    "QEE execution succeeded: %s orders, run_id=%s",
+                    result.get("order_count"),
+                    result.get("run_id"),
+                )
+            else:
+                logger.info(
+                    "QEE dry-run planned: %s orders, run_id=%s",
+                    result.get("order_count"),
+                    result.get("run_id"),
+                )
+            return
 
         # Determine strategy name and order quantity from config
         live_trading_config = self.app_config.get("live_trading", {})

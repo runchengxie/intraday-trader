@@ -129,7 +129,20 @@ strategies:
 live_trading:
   symbol: "AAPL"
   initial_capital: 100000
-  
+  default_order_qty: 10
+
+  # --- Execution Backend ---
+  # backend: "direct" → use BrokerAPIHandler.place_order() directly (default)
+  # backend: "qee"    → route through quant-execution-engine facade
+  execution:
+    backend: "direct"
+    qee:
+      broker_name: "alpaca-paper"
+      dry_run: true
+      target_output_dir: "outputs/targets"
+      allow_short: false
+      order_qty: 10
+
   # --- No-Fill Test Mode Configuration ---
   no_fill_test_mode:
     enabled: false  # Set to true to enable no-fill testing
