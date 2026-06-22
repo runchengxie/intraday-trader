@@ -79,8 +79,8 @@ run-generate-report = "intraday_trader.scripts.run_generate_report:main"  # DEPR
 run-dashboard = "intraday_trader.scripts.run_dashboard:main"  # DEPRECATED
 
 [project.urls]
-Homepage = "N/A"
-"Bug Tracker" = "N/A"
+Homepage = "https://github.com/runchengxie/intraday-trader"
+"Bug Tracker" = "https://github.com/runchengxie/intraday-trader/issues"
 
 # --- Tool-specific configurations ---
 
