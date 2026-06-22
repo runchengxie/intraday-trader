@@ -15,9 +15,21 @@
 - EMA 交叉策略支持 ADX 过滤和移动止损。
 - 参数优化支持网格搜索和并行执行。
 
+### 券商
+
+- 多券商适配层，通过统一 `BrokerAdapter` 协议切换。
+- Alpaca：REST 下单、账户查询、持仓查询、订单状态查询；WebSocket 行情和订单更新订阅。
+- 富途 FutuOpenD：支持港股（HK）、美股（US）、A 股（CN）市场；支持模拟（SIMULATE）和真实（REAL）交易环境；REST 风格下单、账户查询、持仓查询、订单状态查询、批量撤单。
+- 富途适配器当前阶段为 REST 轮询模式，不包含 WebSocket 实时推送。
+
+### 行情源
+
+- 多行情源适配层，通过统一 `MarketDataProvider` 协议切换。
+- Alpaca：历史分钟线和日线 K 线。
+- 富途 FutuOpenD：历史 1/5/15/30/60 分钟和日线 K 线。
+
 ### 数据
 
-- Alpaca API 历史行情拉取，支持分钟级数据。
 - 多级缓存：内存、本地 Parquet/SQLite、远程 PostgreSQL/TimescaleDB。
 - `DBHandler` 支持 `sqlite`、`parquet`、`postgresql` 三种后端，PostgreSQL 下自动创建 hypertable。
 - `intraday data backfill` 回补 `trade_count` 和 `vwap` 字段。
@@ -33,14 +45,24 @@
 
 ### 实盘联调
 
-- Alpaca REST 下单、账户查询、持仓查询、订单状态查询。
-- Alpaca WebSocket 行情和订单更新订阅。
 - `asyncio.Queue` 事件循环处理 trade、bar、订单更新。
 - `RiskManager` 检查 VaR、流动性、点差、市场冲击、杠杆、敞口、价格跳变、成交量异常。
 - `ExceptionHandler` 重试和熔断。
 - `ConsistencyValidator` 信号、成交、绩效一致性检查。
 - `no_fill_test_mode` 测试单和自动撤单。
 - `PerformanceAnalyzer` 风控指标、交易成本、换手率、集中度、相对基准表现。
+
+### 执行管线
+
+- 信号到券商下单的完整管线：信号 → 持仓目标（`SignalTarget`）→ 订单计划（`OrderPlanEntry`）→ 券商适配器下单。
+- 订单计划阶段处理整数手数取整和非美股市场的 lot size。
+- 支持限价单偏移（买价上浮、卖价下浮）和测试模式安全边距。
+
+### QEE 执行路由
+
+- 可选经由 `quant-execution-engine`（QEE）执行信号。
+- 信号转为标准 `targets.json`，导出审计化 lineage 文件。
+- 支持 dry-run 模式（只计划不下单）和实盘提交模式。
 
 ### 仪表盘
 
@@ -65,9 +87,23 @@ flowchart LR
     CLI --> Live[纸上交易引擎]
     CLI --> Report[日报与仪表盘]
 
-    DataJob --> Alpaca[Alpaca API]
-    Live --> Alpaca
-    Alpaca --> DataLayer[DBHandler]
+    DataJob --> ProviderFactory[行情源工厂]
+    ProviderFactory --> AlpacaMD[Alpaca 行情]
+    ProviderFactory --> FutuMD[富途行情]
+
+    Live --> BrokerFactory[券商适配器工厂]
+    BrokerFactory --> AlpacaBroker[Alpaca 适配器]
+    BrokerFactory --> FutuBroker[富途适配器]
+
+    Live --> ExecPipeline[执行管线]
+    ExecPipeline --> Targets[信号→目标]
+    ExecPipeline --> OrderPlan[目标→订单计划]
+    ExecPipeline --> BrokerAdapter[券商适配器]
+
+    Live --> QEEBackend[QEE 执行后端]
+
+    AlpacaMD --> DataLayer[DBHandler]
+    FutuMD --> DataLayer
     Backtest --> DataLayer
     DataLayer --> Storage[(SQLite / Parquet / PostgreSQL / TimescaleDB)]
 
@@ -84,11 +120,17 @@ flowchart LR
 ```tree
 .
 ├── src/intraday_trader/      # 核心代码
+│   ├── analytics/                # 独立指标计算（风险、成本、换手率、相对表现）
 │   ├── backtest/                 # 回测请求对象与执行入口
+│   ├── brokers/                  # 多券商适配层（Alpaca + 富途，统一协议）
+│   ├── data_providers/           # 多行情源（Alpaca + 富途，统一协议）
+│   ├── execution/                # 执行管线（信号→目标→订单计划→下单）
+│   ├── live/                     # 实盘会话编排
 │   ├── scripts/                  # CLI 子命令实现
+│   ├── storage/                  # ORM 模型与 Parquet 存储
 │   └── strategies/               # 策略基类、注册表和内置策略
 ├── tests/                        # 单元测试、集成测试和端到端测试
-├── docs/                         # 项目说明书、设计思路和课程背景归档
+├── docs/                         # 项目说明书、设计思路
 ├── project_tools/                # 开发辅助脚本
 ├── Makefile                      # 本地和 Docker 常用任务
 ├── config.yml                    # 全局配置
@@ -104,13 +146,17 @@ flowchart LR
 | 配置段 | 职责 |
 | --- | --- |
 | `alpaca` | 从环境变量读取 API 密钥和接口地址 |
-| `data` | 标的、回测时间范围、K 线周期、复权方式、字段完整性要求 |
+| `data` | 标的、回测时间范围、K 线周期、复权方式、字段完整性要求、行情源 |
+| `data.provider` | 行情源选择（`name` 可选 `alpaca` 或 `futu`），富途时额外指定 `host`、`port`、`market` |
 | `paths` | 输出、日志、图表和缓存目录 |
 | `benchmark` | 买入持有基准和股息总回报开关 |
 | `database` | 存储后端选择（`sqlite`、`parquet`、`postgresql`） |
 | `backtest` | 初始资金、佣金、滑点和最大 CPU 数 |
 | `strategies` | 策略类、参数、优化网格和订单参数 |
-| `live_trading` | 纸上交易标的、初始资金、no-fill 测试和风控阈值 |
+| `live_trading` | 纸上交易标的、初始资金、券商选择、执行后端和风控阈值 |
+| `live_trading.broker` | 券商选择（`name` 可选 `alpaca` 或 `futu`），富途时额外指定 `market`、`host`、`port`、`mode` |
+| `live_trading.execution` | 执行后端：`backend: direct`（直连券商）或 `backend: qee`（经由 QEE） |
+| `live_trading.execution.qee` | QEE 参数：`broker_name`、`dry_run`、`target_output_dir`、`allow_short`、`order_qty` |
 | `logging` | 日志等级、格式和时间格式 |
 
 环境变量支持 `${ENV_VAR:-default}` 形式。通用配置加载器 `intraday_trader.configuration.load_app_config()` 已支持默认值替换。
@@ -144,7 +190,7 @@ flowchart LR
 | `intraday backtest optimise` | 按 `opt_ranges` 搜索策略参数 | 控制台前十名参数组合和日志 |
 | `intraday backtest benchmark` | 只运行配置中的买入持有基准 | 基准指标和图表 |
 | `intraday generate-report` | 汇总最近 24 小时的交易日志和绩效快照 | `output/daily_report_YYYYMMDD.json` |
-| `intraday live` | 启动 Alpaca 纸上交易事件循环 | 实时日志和订单状态处理 |
+| `intraday live` | 启动纸上/模拟交易事件循环 | 实时日志和订单状态处理 |
 | `intraday dashboard` | 启动 Streamlit 仪表盘 | 默认本地 Web 页面：http://localhost:8501 |
 
 `optimise` 和 `optimize` 都可以使用，二者指向同一个参数优化入口。旧脚本入口仍然保留（`run-backtest`、`run-live` 等），但新文档统一推荐使用 `intraday` 顶层命令。
@@ -231,10 +277,14 @@ make coverage                        # 覆盖率报告
 
 ### 已知测试覆盖缺口
 
-- `scripts/run_backfill_data.py` 没有独立测试，只通过 CLI 间接验证
+- `brokers/`（Alpaca 和富途适配器）没有独立测试
+- `data_providers/`（Alpaca 和富途行情源）没有独立测试
+- `execution/`（信号→目标→订单计划→下单管线）没有独立测试
+- `qee_execution_backend.py` 和 `qee_target_exporter.py` 没有独立测试
 - `consistency_validator.py` 没有独立单元测试
 - `dashboard_app.py` 没有自动化测试
 - `plotting.py` 没有自动化测试
+- `scripts/run_backfill_data.py` 没有独立测试，只通过 CLI 间接验证
 - Docker 容器内测试尚未建立
 
 ## 已知技术债
@@ -258,8 +308,10 @@ make coverage                        # 覆盖率报告
 
 - 策略注册表目前只支持单标的策略，多标的策略需要扩展
 - 因子归因（滚动 beta、信息比率、多因子回归）尚未内置
-- 实盘端接入的 Alpaca 只覆盖 REST 和 WebSocket，未接入 FIX 或其他低延迟链路
+- 富途适配器当前为 REST 轮询模式，未接入 WebSocket 实时推送
+- 新模块（`brokers/`、`data_providers/`、`execution/`、QEE 后端）缺少测试覆盖
 
 ## 变更记录
 
+- 2026-06-22：文档全面更新。README、AGENTS.md、project-manual 反映多券商适配层（Alpaca + 富途）、多行情源层、执行管线（信号→目标→订单计划→下单）、QEE 执行路由、storage/analytics/live 模块拆分等新增能力。新增 `.env.example` 富途环境变量。
 - 2026-06-21：文档全面中文化，README、AGENTS.md、docs/ 全部翻译并整理。cli.py 重构为显式命令解析。新增 test_cli.py。修复 test_live_system.py 和 test_db_handler_storage.py 的 importorskip 缺失。
