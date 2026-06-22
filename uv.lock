@@ -481,7 +481,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "python-dotenv", specifier = ">=0.21,<2.0" },
     { name = "pyyaml", specifier = ">=6.0,<7.0" },
-    { name = "quant-execution-engine", marker = "extra == 'qee'", directory = "/home/richard/code/research-workspace/quant-execution-engine" },
+    { name = "quant-execution-engine", marker = "extra == 'qee'", git = "https://github.com/runchengxie/quant-execution-engine.git" },
     { name = "requests", specifier = ">=2.28,<3.0" },
     { name = "scipy", specifier = ">=1.8,<2.0" },
     { name = "seaborn", marker = "extra == 'dashboard'", specifier = ">=0.12" },
@@ -997,34 +997,9 @@ wheels = [
 [[package]]
 name = "quant-execution-engine"
 version = "0.2.0"
-source = { directory = "/home/richard/code/research-workspace/quant-execution-engine" }
+source = { git = "https://github.com/runchengxie/quant-execution-engine.git#00cfced16ac6cbbb70efa8c4c5041fcc1ef4a0d5" }
 dependencies = [
     { name = "pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alpaca-py", marker = "extra == 'alpaca'" },
-    { name = "alpaca-py", marker = "extra == 'full'" },
-    { name = "ib-insync", marker = "extra == 'full'", specifier = ">=0.9.86" },
-    { name = "ib-insync", marker = "extra == 'ibkr'", specifier = ">=0.9.86" },
-    { name = "longport", marker = "extra == 'full'", specifier = ">=0.2.77" },
-    { name = "longport", marker = "extra == 'longport'", specifier = ">=0.2.77" },
-    { name = "pytz", marker = "extra == 'alpaca'" },
-    { name = "pytz", marker = "extra == 'full'" },
-    { name = "pyyaml" },
-    { name = "rich", marker = "extra == 'cli'", specifier = ">=13" },
-]
-provides-extras = ["cli", "longport", "alpaca", "ibkr", "full"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.10" },
-    { name = "pyright", specifier = ">=1.1.390" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-cov" },
-    { name = "ruff", specifier = ">=0.5" },
-    { name = "types-pyyaml" },
 ]
 
 [[package]]

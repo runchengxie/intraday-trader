@@ -59,7 +59,7 @@ dashboard = [
 
 # QEE execution backend (optional, only needed when execution.backend == "qee")
 qee = [
-    "quant-execution-engine @ file:///home/richard/code/research-workspace/quant-execution-engine",
+    "quant-execution-engine @ git+https://github.com/runchengxie/quant-execution-engine.git",
 ]
 
 [dependency-groups]
