@@ -83,9 +83,7 @@ class EnhancedTradingSystem:
         if isinstance(execution_cfg, dict) and execution_cfg.get("backend") == "qee":
             from intraday_trader.qee_execution_backend import QEEExecutionBackend
 
-            self.qee_backend = QEEExecutionBackend(
-                config=execution_cfg.get("qee", {})
-            )
+            self.qee_backend = QEEExecutionBackend(config=execution_cfg.get("qee", {}))
 
         logger.info("Enhanced trading system initialization completed")
 

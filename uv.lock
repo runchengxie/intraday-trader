@@ -448,6 +448,9 @@ dashboard = [
 postgres = [
     { name = "psycopg2-binary" },
 ]
+qee = [
+    { name = "quant-execution-engine" },
+]
 test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -478,6 +481,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "python-dotenv", specifier = ">=0.21,<2.0" },
     { name = "pyyaml", specifier = ">=6.0,<7.0" },
+    { name = "quant-execution-engine", marker = "extra == 'qee'", directory = "/home/richard/code/research-workspace/quant-execution-engine" },
     { name = "requests", specifier = ">=2.28,<3.0" },
     { name = "scipy", specifier = ">=1.8,<2.0" },
     { name = "seaborn", marker = "extra == 'dashboard'", specifier = ">=0.12" },
@@ -485,7 +489,7 @@ requires-dist = [
     { name = "streamlit", marker = "extra == 'dashboard'" },
     { name = "websockets", specifier = ">=10.0,<12.0" },
 ]
-provides-extras = ["test", "postgres", "dashboard"]
+provides-extras = ["test", "postgres", "dashboard", "qee"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -988,6 +992,39 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/07/91/45dfd0ef821a7f41d9d0136ea3608bb5b1653e42fd56a7970532cb5c003f/PyYAML-6.0.1-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:326c013efe8048858a6d312ddd31d56e468118ad4cdeda36c719bf5bb6192290", size = 707514, upload-time = "2023-08-28T18:43:20.945Z" },
     { url = "https://files.pythonhosted.org/packages/b6/a0/b6700da5d49e9fed49dc3243d3771b598dad07abb37cc32e524607f96adc/PyYAML-6.0.1-cp310-cp310-win32.whl", hash = "sha256:bd4af7373a854424dabd882decdc5579653d7868b8fb26dc7d0e99f823aa5924", size = 130488, upload-time = "2023-07-17T23:57:28.144Z" },
     { url = "https://files.pythonhosted.org/packages/24/97/9b59b43431f98d01806b288532da38099cc6f2fea0f3d712e21e269c0279/PyYAML-6.0.1-cp310-cp310-win_amd64.whl", hash = "sha256:fd1592b3fdf65fff2ad0004b5e363300ef59ced41c2e6b3a99d4089fa8c5435d", size = 145338, upload-time = "2023-07-17T23:57:31.118Z" },
+]
+
+[[package]]
+name = "quant-execution-engine"
+version = "0.2.0"
+source = { directory = "/home/richard/code/research-workspace/quant-execution-engine" }
+dependencies = [
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alpaca-py", marker = "extra == 'alpaca'" },
+    { name = "alpaca-py", marker = "extra == 'full'" },
+    { name = "ib-insync", marker = "extra == 'full'", specifier = ">=0.9.86" },
+    { name = "ib-insync", marker = "extra == 'ibkr'", specifier = ">=0.9.86" },
+    { name = "longport", marker = "extra == 'full'", specifier = ">=0.2.77" },
+    { name = "longport", marker = "extra == 'longport'", specifier = ">=0.2.77" },
+    { name = "pytz", marker = "extra == 'alpaca'" },
+    { name = "pytz", marker = "extra == 'full'" },
+    { name = "pyyaml" },
+    { name = "rich", marker = "extra == 'cli'", specifier = ">=13" },
+]
+provides-extras = ["cli", "longport", "alpaca", "ibkr", "full"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.10" },
+    { name = "pyright", specifier = ">=1.1.390" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-cov" },
+    { name = "ruff", specifier = ">=0.5" },
+    { name = "types-pyyaml" },
 ]
 
 [[package]]

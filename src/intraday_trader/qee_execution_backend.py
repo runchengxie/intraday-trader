@@ -42,9 +42,7 @@ class QEEExecutionBackend:
         cfg = config or {}
         self.broker_name = str(cfg.get("broker_name", "alpaca-paper"))
         self.dry_run = bool(cfg.get("dry_run", True))
-        self.target_output_dir = str(
-            cfg.get("target_output_dir", "outputs/targets")
-        )
+        self.target_output_dir = str(cfg.get("target_output_dir", "outputs/targets"))
         self.allow_short = bool(cfg.get("allow_short", False))
         self.default_order_qty = int(cfg.get("order_qty", 10))
         self._facade: Any = None
@@ -98,7 +96,9 @@ class QEEExecutionBackend:
             return {"executed": False, "error": str(exc), "order_count": 0}
 
         if not targets:
-            logger.debug("No targets generated for signal %s (HOLD or blocked).", signal)
+            logger.debug(
+                "No targets generated for signal %s (HOLD or blocked).", signal
+            )
             return {"executed": False, "error": None, "order_count": 0}
 
         # 2. Optionally export lineage

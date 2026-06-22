@@ -57,6 +57,11 @@ dashboard = [
     "seaborn>=0.12",
 ]
 
+# QEE execution backend (optional, only needed when execution.backend == "qee")
+qee = [
+    "quant-execution-engine @ file:///home/richard/code/research-workspace/quant-execution-engine",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=7.0",
