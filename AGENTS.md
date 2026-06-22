@@ -95,7 +95,6 @@ uv run pytest -m integration
 | `AGENTS.md`（本文件） | 仓库协作规范 | 代码风格、测试要求、提交流程变化时更新 |
 | `docs/project-manual.md` | 项目说明书：能力清单、配置参考、CLI 详解、测试指南、已知技术债 | 功能、配置、测试覆盖或技术债变化时同步更新 |
 | `docs/design-rationale.md` | 设计思路：策略选型、风控模型、绩效框架的考量 | 架构决策或设计理念变化时更新 |
-| `docs/course-background.md` | 课程背景归档，仅作历史参考 | 一般不更新，除非需要补充来源信息
 
 ## 提交与 PR
 

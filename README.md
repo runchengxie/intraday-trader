@@ -99,7 +99,6 @@ flowchart LR
 | `AGENTS.md` | 协作规范、代码风格、测试要求 | 准备提交代码 |
 | `docs/project-manual.md` | 完整能力清单、配置参考、CLI 详解、测试指南、已知技术债 | 深入了解和日常开发 |
 | `docs/design-rationale.md` | 策略选型、风控模型、绩效评估框架背后的设计思路 | 理解"为什么这么设计" |
-| `docs/course-background.md` | 项目最初的 CQF 课程背景归档 | 了解项目来源（可选） |
 
 ## 项目结构
 
