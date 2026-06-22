@@ -11,7 +11,7 @@ from typing import Any
 import backtrader as bt
 import numpy as np
 
-from intraday_trader_air.backtest_utils import analyze_optimization_results
+from intraday_trader.backtest_utils import analyze_optimization_results
 
 logger = logging.getLogger(__name__)
 

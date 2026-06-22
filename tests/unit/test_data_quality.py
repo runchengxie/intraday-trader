@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from intraday_trader_air.data_quality import (
+from intraday_trader.data_quality import (
     build_expected_frequency,
     run_quality_checks,
     write_quality_report,

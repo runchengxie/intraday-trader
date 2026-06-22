@@ -1,4 +1,4 @@
-"""Configuration loading and validation utilities for Intraday Trader Air."""
+"""Configuration loading and validation utilities for intraday-trader."""
 
 from __future__ import annotations
 
@@ -277,7 +277,7 @@ def _validate_database_config(data: Mapping[str, Any] | None) -> DatabaseConfig 
 
 
 def load_app_config(path: Path) -> AppConfig:
-    """Load and validate the Intraday Trader Air configuration from ``path``."""
+    """Load and validate the intraday-trader configuration from ``path``."""
 
     data = _load_yaml(path)
 

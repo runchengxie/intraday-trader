@@ -13,8 +13,8 @@ from dataclasses import asdict
 from dotenv import load_dotenv
 from sqlalchemy import inspect, text
 
-from intraday_trader_air.configuration import load_app_config
-from intraday_trader_air.db_handler import (
+from intraday_trader.configuration import load_app_config
+from intraday_trader.db_handler import (
     DBHandler,
     PerformanceSnapshot,
     TradeLog,

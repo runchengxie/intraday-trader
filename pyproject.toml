@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "intraday-trader-air"
+name = "intraday-trader"
 version = "0.1.0"
 authors = [
   { name="Richard", email="xieruncheng@gmail.com" }
@@ -71,12 +71,12 @@ dev = [
 # NOTE: run-backtest, run-live, run-update-data, run-generate-report, run-dashboard
 # are DEPRECATED. Use the unified `intraday` CLI instead. They will be removed in a future release.
 [project.scripts]
-intraday = "intraday_trader_air.cli:main"
-run-backtest = "intraday_trader_air.scripts.run_backtests:main"  # DEPRECATED
-run-live = "intraday_trader_air.scripts.run_live_trading:main"   # DEPRECATED
-run-update-data = "intraday_trader_air.scripts.run_update_data:main"  # DEPRECATED
-run-generate-report = "intraday_trader_air.scripts.run_generate_report:main"  # DEPRECATED
-run-dashboard = "intraday_trader_air.scripts.run_dashboard:main"  # DEPRECATED
+intraday = "intraday_trader.cli:main"
+run-backtest = "intraday_trader.scripts.run_backtests:main"  # DEPRECATED
+run-live = "intraday_trader.scripts.run_live_trading:main"   # DEPRECATED
+run-update-data = "intraday_trader.scripts.run_update_data:main"  # DEPRECATED
+run-generate-report = "intraday_trader.scripts.run_generate_report:main"  # DEPRECATED
+run-dashboard = "intraday_trader.scripts.run_dashboard:main"  # DEPRECATED
 
 [project.urls]
 Homepage = "N/A"

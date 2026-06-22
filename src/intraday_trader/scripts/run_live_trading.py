@@ -8,28 +8,28 @@ from datetime import datetime, timezone
 import numpy as np
 import websockets
 
-from intraday_trader_air.broker_handler import BrokerAPIHandler
-from intraday_trader_air.consistency_validator import ConsistencyValidator
-from intraday_trader_air.exception_handler import (
+from intraday_trader.broker_handler import BrokerAPIHandler
+from intraday_trader.consistency_validator import ConsistencyValidator
+from intraday_trader.exception_handler import (
     ErrorCategory,
     ErrorSeverity,
     ExceptionHandler,
     handle_exceptions,
 )
-from intraday_trader_air.live_components import (
+from intraday_trader.live_components import (
     LiveMeanReversionStrategy,
     TradingState,
 )
-from intraday_trader_air.performance_analyzer import PerformanceAnalyzer
+from intraday_trader.performance_analyzer import PerformanceAnalyzer
 
 # Import core modules
-from intraday_trader_air.risk_manager import RiskManager
+from intraday_trader.risk_manager import RiskManager
 
 # Logger will be configured in main() after loading config
 logger = logging.getLogger(__name__)
 
 # Re-export for entry-point backward compatibility (pyproject.toml: run-live)
-from intraday_trader_air.live.session import main  # noqa: F401
+from intraday_trader.live.session import main  # noqa: F401
 
 
 class EnhancedTradingSystem:
@@ -1085,6 +1085,6 @@ class EnhancedTradingSystem:
 
 
 if __name__ == "__main__":
-    from intraday_trader_air.live.session import main as _main
+    from intraday_trader.live.session import main as _main
 
     _main()

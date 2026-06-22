@@ -8,7 +8,7 @@ import pytest
 pd = pytest.importorskip("pandas")
 np = pytest.importorskip("numpy")
 
-from intraday_trader_air.performance_analyzer import (
+from intraday_trader.performance_analyzer import (
     PerformanceAnalyzer,
     TradeRecord,
 )

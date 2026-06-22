@@ -62,7 +62,7 @@ fmt:
 	$(call UV_RUN,ruff format .)
 
 coverage:
-	$(call UV_RUN,pytest --cov=intraday_trader_air --cov-report=term-missing)
+	$(call UV_RUN,pytest --cov=intraday_trader --cov-report=term-missing)
 
 typecheck:
 	$(call UV_RUN,pyright src tests)

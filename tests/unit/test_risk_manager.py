@@ -4,7 +4,7 @@ import pytest
 
 np = pytest.importorskip("numpy")
 
-from intraday_trader_air.risk_manager import RiskManager
+from intraday_trader.risk_manager import RiskManager
 
 # --- Pytest Fixtures ---
 

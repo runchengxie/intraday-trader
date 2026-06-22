@@ -1,4 +1,4 @@
-"""Command-line entry point for the Intraday Trader Air framework."""
+"""Command-line entry point for the intraday-trader framework."""
 
 from __future__ import annotations
 
@@ -9,21 +9,21 @@ import typing
 from collections.abc import Callable, Sequence
 
 _BACKTEST_COMMANDS = {
-    "run": "intraday_trader_air.scripts.run_backtests:run_command",
-    "optimise": "intraday_trader_air.scripts.run_backtests:optimise_command",
-    "optimize": "intraday_trader_air.scripts.run_backtests:optimise_command",
-    "benchmark": "intraday_trader_air.scripts.run_backtests:benchmark_command",
+    "run": "intraday_trader.scripts.run_backtests:run_command",
+    "optimise": "intraday_trader.scripts.run_backtests:optimise_command",
+    "optimize": "intraday_trader.scripts.run_backtests:optimise_command",
+    "benchmark": "intraday_trader.scripts.run_backtests:benchmark_command",
 }
 
 _SIMPLE_COMMANDS = {
-    "update-data": "intraday_trader_air.scripts.run_update_data:main",
-    "generate-report": "intraday_trader_air.scripts.run_generate_report:main",
-    "live": "intraday_trader_air.scripts.run_live_trading:main",
-    "dashboard": "intraday_trader_air.scripts.run_dashboard:main",
+    "update-data": "intraday_trader.scripts.run_update_data:main",
+    "generate-report": "intraday_trader.scripts.run_generate_report:main",
+    "live": "intraday_trader.scripts.run_live_trading:main",
+    "dashboard": "intraday_trader.scripts.run_dashboard:main",
 }
 
 _DATA_COMMANDS = {
-    "backfill": "intraday_trader_air.scripts.run_backfill_data:main",
+    "backfill": "intraday_trader.scripts.run_backfill_data:main",
 }
 
 
@@ -31,7 +31,7 @@ _MIN_ARGS = 2
 
 
 class CommandNotFoundError(RuntimeError):
-    """Raised when a user invokes an unknown Intraday Trader Air subcommand."""
+    """Raised when a user invokes an unknown intraday-trader subcommand."""
 
 
 def _load_callable(path: str) -> Callable[[Sequence[str] | None], int | None]:
@@ -47,7 +47,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="intraday",
         description=(
-            "Intraday Trader Air command-line interface. "
+            "intraday-trader command-line interface. "
             "Use one of the available subcommands to interact with the framework."
         ),
     )

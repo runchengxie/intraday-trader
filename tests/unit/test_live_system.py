@@ -9,8 +9,8 @@ pytest.importorskip("pytest_asyncio")
 pytest.importorskip("alpaca_trade_api")
 pytest.importorskip("websockets")
 
-from intraday_trader_air.live_components import TradingState
-from intraday_trader_air.scripts.run_live_trading import EnhancedTradingSystem
+from intraday_trader.live_components import TradingState
+from intraday_trader.scripts.run_live_trading import EnhancedTradingSystem
 
 
 @pytest.mark.asyncio

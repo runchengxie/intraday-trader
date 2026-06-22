@@ -5,16 +5,16 @@ import pytest
 pd = pytest.importorskip("pandas")
 bt = pytest.importorskip("backtrader")
 
-from intraday_trader_air.backtest.engine import BacktestEngine
-from intraday_trader_air.scripts.run_backtests import extend_pandas_data
-from intraday_trader_air.strategies import (
+from intraday_trader.backtest.engine import BacktestEngine
+from intraday_trader.scripts.run_backtests import extend_pandas_data
+from intraday_trader.strategies import (
     BaseStrategy,
     BuyAndHold,
     EMACrossover,
     MeanReversion,
     RatioStrategy,
 )
-from intraday_trader_air.strategies.utils import (
+from intraday_trader.strategies.utils import (
     compute_ratio,
     compute_zscore,
     validate_series,

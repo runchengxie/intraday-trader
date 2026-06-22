@@ -1,4 +1,4 @@
-# Intraday Trader Air
+# intraday-trader
 
 基于 Python 3.10 的日内量化交易项目，覆盖策略开发、历史回测、Alpaca 纸上交易接入，以及行情、交易记录和绩效数据的本地与数据库存储。
 
@@ -104,7 +104,7 @@ flowchart LR
 
 ```tree
 .
-├── src/intraday_trader_air/      # 核心代码
+├── src/intraday_trader/      # 核心代码
 │   ├── backtest/                 # 回测请求对象与执行入口
 │   ├── scripts/                  # CLI 子命令实现
 │   └── strategies/               # 策略基类、注册表和内置策略
@@ -134,7 +134,7 @@ flowchart LR
 
 **如何扩展新策略？**
 
-在 `src/intraday_trader_air/strategies/` 中新增策略类，把类加入 `REGISTRY`，再在 `config.yml` 的 `strategies` 段配置参数和优化网格。
+在 `src/intraday_trader/strategies/` 中新增策略类，把类加入 `REGISTRY`，再在 `config.yml` 的 `strategies` 段配置参数和优化网格。
 
 **如何切换数据存储后端？**
 

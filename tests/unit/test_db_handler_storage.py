@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from sqlalchemy import text
 
-from intraday_trader_air.db_handler import DBHandler
+from intraday_trader.db_handler import DBHandler
 
 
 def _parquet_engine_available() -> bool:

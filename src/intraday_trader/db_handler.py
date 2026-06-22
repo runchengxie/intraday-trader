@@ -16,13 +16,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
-from intraday_trader_air.storage.models import (
+from intraday_trader.storage.models import (
     Base,
     MarketData,
     PerformanceSnapshot,
     TradeLog,
 )
-from intraday_trader_air.storage.parquet import ParquetStore
+from intraday_trader.storage.parquet import ParquetStore
 
 logger = logging.getLogger(__name__)
 

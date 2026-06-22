@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("alpaca_trade_api")
 from alpaca_trade_api.rest import APIError
 
-from intraday_trader_air.broker_handler import BrokerAPIHandler
+from intraday_trader.broker_handler import BrokerAPIHandler
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def mock_broker_dependencies(monkeypatch, mocker):
     mock_rest.get_account.return_value = mocker.MagicMock(
         id="acct-123", status="ACTIVE", buying_power="100000"
     )
-    mocker.patch("intraday_trader_air.broker_handler.REST", return_value=mock_rest)
+    mocker.patch("intraday_trader.broker_handler.REST", return_value=mock_rest)
 
     return mock_rest
 
@@ -80,7 +80,7 @@ class _DummyStream:
 async def test_streaming_uses_callbacks(monkeypatch, mock_broker_dependencies):
     """BrokerAPIHandler should forward streamed trades to the provided callback."""
 
-    monkeypatch.setattr("intraday_trader_air.broker_handler.Stream", _DummyStream)
+    monkeypatch.setattr("intraday_trader.broker_handler.Stream", _DummyStream)
 
     handler = BrokerAPIHandler()
 

@@ -2,7 +2,7 @@
 
 ## 项目结构
 
-生产代码位于 `src/intraday_trader_air/`。其中：
+生产代码位于 `src/intraday_trader/`。其中：
 
 - `backtest/` 放置回测请求对象与执行入口。
 - `strategies/` 放置策略基类、策略注册表和内置策略。

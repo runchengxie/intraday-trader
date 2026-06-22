@@ -14,14 +14,14 @@ import pandas as pd
 from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
 
-from intraday_trader_air.configuration import (
+from intraday_trader.configuration import (
     AppConfig,
     ConfigurationError,
     load_app_config,
 )
-from intraday_trader_air.data_utils import ensure_price_columns, fetch_api_bars
-from intraday_trader_air.db_handler import DBHandler
-from intraday_trader_air.logging_utils import ensure_directory, setup_logging
+from intraday_trader.data_utils import ensure_price_columns, fetch_api_bars
+from intraday_trader.db_handler import DBHandler
+from intraday_trader.logging_utils import ensure_directory, setup_logging
 
 _LOGGER = logging.getLogger(__name__)
 

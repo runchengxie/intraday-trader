@@ -12,7 +12,7 @@ import signal
 from dataclasses import asdict
 from pathlib import Path
 
-from intraday_trader_air.configuration import load_app_config
+from intraday_trader.configuration import load_app_config
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def _shutdown(sig, loop):
 
 async def run_trading_session(app_config: dict) -> None:
     """Core async logic for a single live trading session."""
-    from intraday_trader_air.scripts.run_live_trading import EnhancedTradingSystem
+    from intraday_trader.scripts.run_live_trading import EnhancedTradingSystem
 
     trading_system = EnhancedTradingSystem(app_config)
 

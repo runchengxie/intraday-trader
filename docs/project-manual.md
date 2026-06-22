@@ -1,6 +1,6 @@
 # 项目说明书
 
-本文是 Intraday Trader Air 的项目说明书，面向新接手项目的开发者。内容包括能力清单、配置参考、CLI 命令详解、测试指南和已知技术债。
+本文是 intraday-trader 的项目说明书，面向新接手项目的开发者。内容包括能力清单、配置参考、CLI 命令详解、测试指南和已知技术债。
 
 阅读顺序建议：先看根目录 `README.md` 了解项目概貌和快速开始，再回到本文深入细节。
 
@@ -27,7 +27,7 @@
 ### 回测
 
 - 基于 Backtrader 的事件驱动回测。
-- 统一入口 `intraday_trader_air.backtest.engine.run_backtest()`。
+- 统一入口 `intraday_trader.backtest.engine.run_backtest()`。
 - 输出指标：最终资产、交易次数、胜率、净利润、夏普比率、最大回撤、年化收益、VaR、CVaR、换手率。
 - 含股息总回报基准。
 
@@ -83,7 +83,7 @@ flowchart LR
 
 ```tree
 .
-├── src/intraday_trader_air/      # 核心代码
+├── src/intraday_trader/      # 核心代码
 │   ├── backtest/                 # 回测请求对象与执行入口
 │   ├── scripts/                  # CLI 子命令实现
 │   └── strategies/               # 策略基类、注册表和内置策略
@@ -113,7 +113,7 @@ flowchart LR
 | `live_trading` | 纸上交易标的、初始资金、no-fill 测试和风控阈值 |
 | `logging` | 日志等级、格式和时间格式 |
 
-环境变量支持 `${ENV_VAR:-default}` 形式。通用配置加载器 `intraday_trader_air.configuration.load_app_config()` 已支持默认值替换。
+环境变量支持 `${ENV_VAR:-default}` 形式。通用配置加载器 `intraday_trader.configuration.load_app_config()` 已支持默认值替换。
 
 已知问题：`run_live_trading.py` 内部还有一个旧版 YAML 加载函数，默认值替换能力较弱，后续应统一到通用配置加载器。
 

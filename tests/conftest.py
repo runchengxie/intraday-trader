@@ -1,4 +1,4 @@
-"""Common pytest fixtures for Intraday Trader Air."""
+"""Common pytest fixtures for intraday-trader."""
 # pyright: reportUnknownMemberType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportOptionalMemberAccess=false, reportArgumentType=false, reportGeneralTypeIssues=false
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from intraday_trader_air.configuration import AppConfig, load_app_config
+from intraday_trader.configuration import AppConfig, load_app_config
 
 
 @pytest.fixture(scope="session")

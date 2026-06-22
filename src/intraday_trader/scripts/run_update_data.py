@@ -8,14 +8,14 @@ from pathlib import Path
 from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
 
-from intraday_trader_air.configuration import load_app_config
-from intraday_trader_air.data_quality import (
+from intraday_trader.configuration import load_app_config
+from intraday_trader.data_quality import (
     build_expected_frequency,
     run_quality_checks,
     write_quality_report,
 )
-from intraday_trader_air.data_utils import fetch_historical_data
-from intraday_trader_air.db_handler import DBHandler
+from intraday_trader.data_utils import fetch_historical_data
+from intraday_trader.db_handler import DBHandler
 
 # (Configure logging)
 logging.basicConfig(

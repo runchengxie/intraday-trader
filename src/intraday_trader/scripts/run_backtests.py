@@ -1,4 +1,4 @@
-"""CLI entry points for running Intraday Trader Air backtests."""
+"""CLI entry points for running intraday-trader backtests."""
 
 from __future__ import annotations
 
@@ -19,18 +19,18 @@ from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from intraday_trader_air.backtest.engine import BacktestRequest, run_backtest
-from intraday_trader_air.configuration import (
+from intraday_trader.backtest.engine import BacktestRequest, run_backtest
+from intraday_trader.configuration import (
     AppConfig,
     ConfigurationError,
     StrategyConfig,
     load_app_config,
 )
-from intraday_trader_air.data_utils import apply_kalman_filter, fetch_historical_data
-from intraday_trader_air.db_handler import DBHandler
-from intraday_trader_air.logging_utils import ensure_directory, setup_logging
-from intraday_trader_air.strategies import REGISTRY
-from intraday_trader_air.strategies.buy_and_hold import BuyAndHoldStrategy
+from intraday_trader.data_utils import apply_kalman_filter, fetch_historical_data
+from intraday_trader.db_handler import DBHandler
+from intraday_trader.logging_utils import ensure_directory, setup_logging
+from intraday_trader.strategies import REGISTRY
+from intraday_trader.strategies.buy_and_hold import BuyAndHoldStrategy
 
 _LOGGER = logging.getLogger(__name__)
 

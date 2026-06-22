@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from intraday_trader_air.cli import CommandNotFoundError, _resolve_command, main
+from intraday_trader.cli import CommandNotFoundError, _resolve_command, main
 
 
 def test_resolve_backtest_run():

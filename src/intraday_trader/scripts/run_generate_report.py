@@ -5,10 +5,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from intraday_trader_air.configuration import load_app_config
-from intraday_trader_air.db_handler import DBHandler
-from intraday_trader_air.logging_utils import ensure_directory
-from intraday_trader_air.performance_analyzer import PerformanceAnalyzer
+from intraday_trader.configuration import load_app_config
+from intraday_trader.db_handler import DBHandler
+from intraday_trader.logging_utils import ensure_directory
+from intraday_trader.performance_analyzer import PerformanceAnalyzer
 
 
 def main():
