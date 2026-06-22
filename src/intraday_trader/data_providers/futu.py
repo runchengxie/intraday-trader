@@ -97,9 +97,7 @@ class FutuMarketDataProvider:
         from futu import RET_OK
 
         if ret != RET_OK:
-            logger.error(
-                "request_history_kline error for %s: %s", futu_code, data
-            )
+            logger.error("request_history_kline error for %s: %s", futu_code, data)
             return None
 
         if data is None or data.empty:

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 _FUTU_STATUS_MAP: dict[str, str] = {
     "SUBMITTING": "open",
     "SUBMITTED": "open",
-    "FILLED_PART": "open",       # partial fill → still open
+    "FILLED_PART": "open",  # partial fill → still open
     "FILLED_ALL": "filled",
     "CANCELLED_PART": "canceled",
     "CANCELLED_ALL": "canceled",
@@ -46,8 +46,8 @@ _FUTU_STATUS_MAP: dict[str, str] = {
 class FutuConnectionConfig:
     host: str = "127.0.0.1"
     port: int = 11111
-    trd_env: str = "SIMULATE"   # "SIMULATE" | "REAL"
-    market: str = "HK"          # "HK" | "US" | "CN"
+    trd_env: str = "SIMULATE"  # "SIMULATE" | "REAL"
+    market: str = "HK"  # "HK" | "US" | "CN"
 
 
 # ---------------------------------------------------------------------------
@@ -106,12 +106,8 @@ class FutuBrokerAdapter:
             self._cfg.market,
         )
 
-        self._trade_ctx = OpenSecTradeContext(
-            host=self._cfg.host, port=self._cfg.port
-        )
-        self._quote_ctx = OpenQuoteContext(
-            host=self._cfg.host, port=self._cfg.port
-        )
+        self._trade_ctx = OpenSecTradeContext(host=self._cfg.host, port=self._cfg.port)
+        self._quote_ctx = OpenQuoteContext(host=self._cfg.host, port=self._cfg.port)
 
         # Security gate: REAL requires unlock password.
         if self._TrdEnv == TrdEnv.REAL:

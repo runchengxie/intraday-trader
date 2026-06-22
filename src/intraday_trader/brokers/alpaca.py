@@ -130,14 +130,10 @@ def _alpaca_order_to_standard(order: Any) -> StandardOrder:
             else None
         ),
         limit_price=(
-            float(order.limit_price)
-            if getattr(order, "limit_price", None)
-            else None
+            float(order.limit_price) if getattr(order, "limit_price", None) else None
         ),
         stop_price=(
-            float(order.stop_price)
-            if getattr(order, "stop_price", None)
-            else None
+            float(order.stop_price) if getattr(order, "stop_price", None) else None
         ),
         time_in_force=str(getattr(order, "time_in_force", "day")),
         created_at=str(getattr(order, "created_at", "") or ""),

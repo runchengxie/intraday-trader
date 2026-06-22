@@ -24,9 +24,9 @@ class OrderPlanEntry:
     """
 
     symbol: str
-    side: str         # "buy" | "sell"
+    side: str  # "buy" | "sell"
     qty: float
-    order_type: str   # "market" | "limit"
+    order_type: str  # "market" | "limit"
     limit_price: float | None = None
     time_in_force: str = "day"
     client_order_id: str = ""
@@ -90,17 +90,14 @@ def build_order_plan(
             else:
                 limit_price = round(current_price * (1 + test_price_offset_pct), 4)
         elif side == "buy":
-            limit_price = round(
-                current_price * (1 + opts.buy_markup_bps / 10000.0), 4
-            )
+            limit_price = round(current_price * (1 + opts.buy_markup_bps / 10000.0), 4)
         else:
             limit_price = round(
                 current_price * (1 - opts.sell_discount_bps / 10000.0), 4
             )
 
     client_order_id = (
-        f"{'no-fill-test' if is_test_mode else client_order_id_prefix}"
-        f"_{uuid.uuid4()}"
+        f"{'no-fill-test' if is_test_mode else client_order_id_prefix}_{uuid.uuid4()}"
     )
 
     return OrderPlanEntry(

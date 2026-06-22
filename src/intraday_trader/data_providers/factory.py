@@ -44,9 +44,7 @@ def create_data_provider(app_config: dict[str, Any]) -> Any:
     if name == "futu":
         return _create_futu(provider_cfg)
 
-    raise ValueError(
-        f"Unknown data provider: {name!r}. Supported: alpaca, futu."
-    )
+    raise ValueError(f"Unknown data provider: {name!r}. Supported: alpaca, futu.")
 
 
 def _create_alpaca() -> Any:

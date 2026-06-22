@@ -28,8 +28,8 @@ class BarRequest:
 
     symbol: str
     timeframe: str  # "1Min" | "5Min" | "15Min" | "1Day" | ...
-    start: str      # ISO date string "YYYY-MM-DD"
-    end: str        # ISO date string "YYYY-MM-DD"
+    start: str  # ISO date string "YYYY-MM-DD"
+    end: str  # ISO date string "YYYY-MM-DD"
     adjustment: str = "raw"  # "raw" | "split" | "dividend" | "all"
 
 

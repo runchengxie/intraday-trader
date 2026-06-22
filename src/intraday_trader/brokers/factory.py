@@ -43,9 +43,7 @@ def create_broker(app_config: dict[str, Any]) -> Any:
     if name == "futu":
         return _create_futu(broker_cfg)
 
-    raise ValueError(
-        f"Unknown broker name: {name!r}. Supported: alpaca, futu."
-    )
+    raise ValueError(f"Unknown broker name: {name!r}. Supported: alpaca, futu.")
 
 
 def _create_alpaca() -> Any:

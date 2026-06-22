@@ -60,9 +60,7 @@ class AlpacaMarketDataProvider:
         )
         self._add_retries()
 
-        logger.info(
-            "AlpacaMarketDataProvider initialised (base_url=%s)", resolved_url
-        )
+        logger.info("AlpacaMarketDataProvider initialised (base_url=%s)", resolved_url)
 
     # -- MarketDataProvider interface ---------------------------------------
 

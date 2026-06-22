@@ -566,7 +566,9 @@ class EnhancedTradingSystem:
             logger.info("Executing CLOSE for %s via pipeline.", target.symbol)
             try:
                 self.broker_handler.api.close_position(target.symbol)
-                logger.info("CLOSE submitted via broker close_position for %s.", target.symbol)
+                logger.info(
+                    "CLOSE submitted via broker close_position for %s.", target.symbol
+                )
             except AttributeError:
                 result = execute_close_via_order(
                     self.broker_handler,
@@ -574,7 +576,13 @@ class EnhancedTradingSystem:
                     self.trading_state.current_position_qty,
                     current_price,
                 )
-                self._handle_execution_result(result, baseline_cash, baseline_position, current_price, is_test_mode)
+                self._handle_execution_result(
+                    result,
+                    baseline_cash,
+                    baseline_position,
+                    current_price,
+                    is_test_mode,
+                )
             return
 
         # --- Stage 3: SignalTarget → OrderPlan ---
@@ -584,7 +592,8 @@ class EnhancedTradingSystem:
         plan_opts = OrderPlanOptions(
             lot_size=broker_cfg.get("lot_size", 1),
             buy_markup_bps=order_settings.get("limit_price_offset_pct", 0.0005) * 10000,
-            sell_discount_bps=order_settings.get("limit_price_offset_pct", 0.0005) * 10000,
+            sell_discount_bps=order_settings.get("limit_price_offset_pct", 0.0005)
+            * 10000,
             default_order_type=order_settings.get("entry_order_type", "market"),
         )
 
@@ -608,9 +617,13 @@ class EnhancedTradingSystem:
 
         # --- Stage 4: OrderPlan → BrokerAdapter ---
         result = execute_order_plan(plan, self.broker_handler)
-        self._handle_execution_result(result, baseline_cash, baseline_position, current_price, is_test_mode)
+        self._handle_execution_result(
+            result, baseline_cash, baseline_position, current_price, is_test_mode
+        )
 
-    def _handle_execution_result(self, result, baseline_cash, baseline_position, current_price, is_test_mode):
+    def _handle_execution_result(
+        self, result, baseline_cash, baseline_position, current_price, is_test_mode
+    ):
         """Post-order tracking: set active order and schedule reconciliation."""
         order = result.get("order")
         if order is None:
@@ -627,7 +640,9 @@ class EnhancedTradingSystem:
 
         if is_test_mode:
             logger.info("[NO-FILL-TEST] Order placed: %s", order_id)
-            no_fill_config = self.app_config.get("live_trading", {}).get("no_fill_test_mode", {})
+            no_fill_config = self.app_config.get("live_trading", {}).get(
+                "no_fill_test_mode", {}
+            )
             test_duration = no_fill_config.get("test_duration_seconds", 60)
             asyncio.create_task(  # noqa: RUF006 — fire-and-forget, handled by auto-cancel
                 self._auto_cancel_test_order(order_id, test_duration)

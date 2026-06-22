@@ -70,7 +70,9 @@ def signal_to_target(
 
     if signal_upper == "SELL":
         # For single-symbol loop: SELL from existing position.
-        sell_qty = int(abs(current_position_qty)) if current_position_qty > 0 else order_qty
+        sell_qty = (
+            int(abs(current_position_qty)) if current_position_qty > 0 else order_qty
+        )
         return SignalTarget(
             symbol=symbol,
             market=market,

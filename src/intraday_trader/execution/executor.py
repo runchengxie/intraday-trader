@@ -54,11 +54,15 @@ def execute_order_plan(
         return {"order": None, "error": str(exc), "plan": plan_entry}
 
     if order is None:
-        logger.error("place_order returned None for %s %s", plan_entry.symbol, plan_entry.signal)
+        logger.error(
+            "place_order returned None for %s %s", plan_entry.symbol, plan_entry.signal
+        )
         return {"order": None, "error": "place_order returned None", "plan": plan_entry}
 
     order_id = getattr(order, "id", getattr(order, "order_id", "unknown"))
-    logger.info("Order submitted: id=%s, status=%s", order_id, getattr(order, "status", "?"))
+    logger.info(
+        "Order submitted: id=%s, status=%s", order_id, getattr(order, "status", "?")
+    )
 
     return {"order": order, "error": None, "plan": plan_entry}
 
