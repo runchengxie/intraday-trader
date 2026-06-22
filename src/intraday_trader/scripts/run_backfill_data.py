@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
-from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
 
 from intraday_trader.configuration import (
@@ -19,24 +17,12 @@ from intraday_trader.configuration import (
     ConfigurationError,
     load_app_config,
 )
+from intraday_trader.data_providers import create_data_provider
 from intraday_trader.data_utils import ensure_price_columns, fetch_api_bars
 from intraday_trader.db_handler import DBHandler
 from intraday_trader.logging_utils import ensure_directory, setup_logging
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _create_alpaca_client() -> REST:
-    api_key = os.getenv("APCA_API_KEY_ID")
-    secret_key = os.getenv("APCA_API_SECRET_KEY")
-    base_url = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
-
-    if not api_key or not secret_key:
-        raise SystemExit(
-            "Alpaca credentials missing. Set APCA_API_KEY_ID and APCA_API_SECRET_KEY."
-        )
-
-    return REST(api_key, secret_key, base_url=base_url, api_version="v2")
 
 
 def _parse_symbols(raw: str | None, default: str) -> list[str]:
@@ -97,8 +83,8 @@ Window = tuple[pd.Timestamp, pd.Timestamp]
 
 
 class BackfillRunner:
-    def __init__(self, api: REST, db_handler: DBHandler, options: BackfillOptions):
-        self._api = api
+    def __init__(self, provider, db_handler: DBHandler, options: BackfillOptions):
+        self._provider = provider
         self._db_handler = db_handler
         self._options = options
 
@@ -124,9 +110,9 @@ class BackfillRunner:
 
         for attempt in range(1, self._options.max_retries + 1):
             bars = fetch_api_bars(
-                self._api,
+                self._provider,
                 symbol,
-                TimeFrame.Minute,
+                "1Min",
                 start_str,
                 end_str,
                 adjustment=self._options.adjustment,
@@ -247,7 +233,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     db_handler.initialize_db()
 
-    api = _create_alpaca_client()
+    provider = create_data_provider(vars(config))
 
     symbols = _parse_symbols(args.symbols, config.data.ticker)
     start = args.start or config.data.start_date
@@ -260,7 +246,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         required_fields=required_fields,
         max_retries=args.max_retries,
     )
-    runner = BackfillRunner(api, db_handler, options)
+    runner = BackfillRunner(provider, db_handler, options)
 
     for symbol in symbols:
         runner.run(symbol, start, end)

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import logging
 import multiprocessing
-import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,10 +13,7 @@ from pathlib import Path
 
 import backtrader as bt
 import pandas as pd
-from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from intraday_trader.backtest.engine import BacktestRequest, run_backtest
 from intraday_trader.configuration import (
@@ -26,6 +22,7 @@ from intraday_trader.configuration import (
     StrategyConfig,
     load_app_config,
 )
+from intraday_trader.data_providers import create_data_provider
 from intraday_trader.data_utils import apply_kalman_filter, fetch_historical_data
 from intraday_trader.db_handler import DBHandler
 from intraday_trader.logging_utils import ensure_directory, setup_logging
@@ -40,7 +37,7 @@ class RuntimeContext:
     """Objects shared across CLI subcommands after initialisation."""
 
     config: AppConfig
-    api: REST
+    provider: object
     db_handler: DBHandler | None
     price_frame: pd.DataFrame
     log_file: Path
@@ -108,45 +105,21 @@ def _initialise_runtime(config_path: Path) -> RuntimeContext:
             )
             db_handler = None
 
-    api = _create_alpaca_client()
+    provider = create_data_provider(vars(config))
 
     price_frame = _load_price_frame(
         config=config,
-        api=api,
+        provider=provider,
         db_handler=db_handler,
     )
 
     return RuntimeContext(
         config=config,
-        api=api,
+        provider=provider,
         db_handler=db_handler,
         price_frame=price_frame,
         log_file=log_file,
     )
-
-
-def _create_alpaca_client() -> REST:
-    api_key = os.getenv("APCA_API_KEY_ID")
-    secret_key = os.getenv("APCA_API_SECRET_KEY")
-    base_url = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
-
-    if not api_key or not secret_key:
-        raise SystemExit(
-            "Alpaca credentials missing. Set APCA_API_KEY_ID and APCA_API_SECRET_KEY."
-        )
-
-    client = REST(api_key, secret_key, base_url=base_url, api_version="v2")
-    retry_strategy = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["GET"],
-    )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    client._session.mount("https://", adapter)
-    client._session.mount("http://", adapter)
-    _LOGGER.info("Initialised Alpaca client with retries for HTTP errors")
-    return client
 
 
 def _resample_price_data(
@@ -229,7 +202,7 @@ def _resample_price_data(
 
 def _load_price_frame(
     config: AppConfig,
-    api: REST,
+    provider: object,
     db_handler: DBHandler | None,
 ) -> pd.DataFrame:
     _LOGGER.info(
@@ -241,9 +214,9 @@ def _load_price_frame(
     )
 
     bars = fetch_historical_data(
-        api,
+        provider,
         config.data.ticker,
-        TimeFrame.Minute,
+        "1Min",
         config.data.start_date,
         config.data.end_date,
         cache_dir=str(config.paths.cache_dir),
@@ -353,14 +326,16 @@ def _run_benchmark(
 
 
 def _fetch_dividends(runtime: RuntimeContext) -> pd.DataFrame:
-    if not hasattr(runtime.api, "get_dividends"):
+    # Dividends are currently Alpaca-only. Access the inner REST client.
+    api_client = getattr(runtime.provider, "_api", None)
+    if api_client is None or not hasattr(api_client, "get_dividends"):
         _LOGGER.debug(
             "Alpaca client has no get_dividends method; skipping dividend fetch"
         )
         return pd.DataFrame()
 
     try:
-        response = runtime.api.get_dividends(
+        response = api_client.get_dividends(
             runtime.config.data.ticker,
             start=runtime.config.data.start_date,
             end=runtime.config.data.end_date,

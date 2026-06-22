@@ -26,6 +26,8 @@ classifiers = [
 ]
 
 # Core dependencies: these are required to run the project.
+# NOTE: alpaca-trade-api is still a core dependency for backward compatibility.
+# After Phase 2 (broker_handler.py shim removal), it will move to optional.
 dependencies = [
     "pandas>=1.5,<3.0",
     "numpy>=1.26,<2.1",
@@ -60,6 +62,11 @@ dashboard = [
 # QEE execution backend (optional, only needed when execution.backend == "qee")
 qee = [
     "quant-execution-engine @ git+https://github.com/runchengxie/quant-execution-engine.git",
+]
+
+# Futu / FutuOpenD broker adapter (optional, only needed when broker.name == "futu")
+futu = [
+    "futu-api>=9.6",
 ]
 
 [dependency-groups]

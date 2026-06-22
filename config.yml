@@ -7,6 +7,14 @@ alpaca:
 
 # --- General Data Configuration ---
 data:
+  # --- Market Data Provider ---
+  # When absent, defaults to Alpaca for backward compatibility.
+  provider:
+    name: "alpaca"              # "alpaca" | "futu"
+  # market: "HK"                # for Futu: "HK" | "US" | "CN"
+  # host: "127.0.0.1"           # for Futu: OpenD host
+  # port: 11111                 # for Futu: OpenD port
+
   ticker: "SPY"
   timeframe_value: 15
   timeframe_unit: "Minute" # 'Minute', 'Hour', 'Day'
@@ -131,8 +139,17 @@ live_trading:
   initial_capital: 100000
   default_order_qty: 10
 
+  # --- Broker Adapter (Phase 1: multi-broker) ---
+  # When absent, defaults to Alpaca for backward compatibility.
+  broker:
+    name: "alpaca"              # "alpaca" | "futu"
+    # market: "HK"              # for Futu: "HK" | "US" | "CN"
+    # mode: "simulate"          # for Futu: "simulate" | "real"
+    # host: "127.0.0.1"         # for Futu: OpenD host
+    # port: 11111               # for Futu: OpenD port
+
   # --- Execution Backend ---
-  # backend: "direct" → use BrokerAPIHandler.place_order() directly (default)
+  # backend: "direct" → use broker adapter directly (default)
   # backend: "qee"    → route through quant-execution-engine facade
   execution:
     backend: "direct"

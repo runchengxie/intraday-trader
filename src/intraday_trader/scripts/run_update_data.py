@@ -1,14 +1,13 @@
 import logging
-import os
 import sys
 from dataclasses import asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from alpaca_trade_api.rest import REST, TimeFrame
 from dotenv import load_dotenv
 
 from intraday_trader.configuration import load_app_config
+from intraday_trader.data_providers import create_data_provider
 from intraday_trader.data_quality import (
     build_expected_frequency,
     run_quality_checks,
@@ -42,16 +41,7 @@ def main():
     db_handler = DBHandler(asdict(config.database) if config.database else {})
     db_handler.initialize_db()
 
-    API_KEY = os.getenv("APCA_API_KEY_ID")
-    SECRET_KEY = os.getenv("APCA_API_SECRET_KEY")
-    BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
-
-    if not API_KEY or not SECRET_KEY:
-        raise RuntimeError(
-            "APCA_API_KEY_ID and APCA_API_SECRET_KEY must be set in .env"
-        )
-
-    api = REST(API_KEY, SECRET_KEY, base_url=BASE_URL)  # type: ignore[arg-type]
+    provider = create_data_provider(asdict(config))
 
     # --- Core Logic ---
     # Usually fetch data for yesterday
@@ -62,9 +52,9 @@ def main():
 
     # fetch_historical_data already includes logic to write to the database
     bars = fetch_historical_data(
-        api=api,
+        provider=provider,
         symbol=symbol,
-        timeframe=TimeFrame.Minute,  # type: ignore  # Fetch minute data
+        timeframe="1Min",
         start_date=yesterday,
         end_date=yesterday,
         cache_dir=str(config.paths.cache_dir),

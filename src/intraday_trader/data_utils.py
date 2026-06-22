@@ -4,6 +4,8 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
+from .data_providers.protocols import BarRequest
+
 NY_TIMEZONE = "America/New_York"
 from .db_handler import DBHandler
 
@@ -125,43 +127,32 @@ def _load_from_cache(cache_filepath: str) -> pd.DataFrame | None:
         return None
 
 
-def _fetch_from_api(
-    api,
+def _fetch_from_provider(
+    provider,
     symbol: str,
-    timeframe,
+    timeframe: str,
     start_date: str,
     end_date: str,
-    adjustment: str,
+    adjustment: str = "raw",
 ) -> pd.DataFrame | None:
+    """Fetch bars through a :class:`~.data_providers.protocols.MarketDataProvider`."""
     try:
         logger.info(
-            "Fetching %s %s data from %s to %s via API...",
+            "Fetching %s %s data from %s to %s via provider...",
             symbol,
             timeframe,
             start_date,
             end_date,
         )
-        start_dt_iso = (
-            pd.Timestamp(start_date, tz=NY_TIMEZONE).tz_convert("UTC").isoformat()
-        )
-        end_dt_iso = (
-            (
-                pd.Timestamp(end_date, tz=NY_TIMEZONE)
-                + timedelta(days=1)
-                - timedelta(seconds=1)
-            )
-            .tz_convert("UTC")
-            .isoformat()
-        )
-
-        bars = api.get_bars(
-            symbol,
-            timeframe,
-            start=start_dt_iso,
-            end=end_dt_iso,
+        request = BarRequest(
+            symbol=symbol,
+            timeframe=timeframe,
+            start=start_date,
+            end=end_date,
             adjustment=adjustment,
-        ).df
-        return bars if bars is not None else None
+        )
+        bars = provider.get_bars(request)
+        return bars if bars is not None and not bars.empty else None
     except Exception as exc:
         logger.error("Error fetching %s data: %s", symbol, exc)
         return None
@@ -194,17 +185,17 @@ def ensure_price_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fetch_api_bars(
-    api,
+    provider,
     symbol: str,
-    timeframe,
+    timeframe: str,
     start_date: str,
     end_date: str,
     adjustment: str = "raw",
 ) -> pd.DataFrame | None:
-    """Fetch historical bars straight from the API with normalization."""
+    """Fetch historical bars through the provider with normalization."""
 
-    bars = _fetch_from_api(
-        api,
+    bars = _fetch_from_provider(
+        provider,
         symbol,
         timeframe,
         start_date,
@@ -219,18 +210,18 @@ def fetch_api_bars(
 
 
 def fetch_historical_data(
-    api,
+    provider,
     symbol,
-    timeframe,
+    timeframe: str,
     start_date,
     end_date,
     cache_dir: str,
     db_handler: DBHandler = None,
     adjustment: str = "raw",
 ):
-    """
-    Fetches historical bar data, using the database as the primary cache.
-    Falls back to the Alpaca API if data is not in the database.
+    """Fetches historical bar data via a MarketDataProvider.
+
+    Tries database first, then local cache, then the provider API.
     """
 
     cache_filepath = _build_cache_path(
@@ -245,9 +236,9 @@ def fetch_historical_data(
         bars = _load_from_cache(cache_filepath)
 
     if bars is None:
-        data_source = "api"
-        bars = _fetch_from_api(
-            api, symbol, timeframe, start_date, end_date, adjustment=adjustment
+        data_source = "provider"
+        bars = _fetch_from_provider(
+            provider, symbol, timeframe, start_date, end_date, adjustment=adjustment
         )
 
     if bars is None or getattr(bars, "empty", False):
@@ -262,7 +253,7 @@ def fetch_historical_data(
 
     bars = ensure_price_columns(bars)
 
-    if data_source == "api":
+    if data_source == "provider":
         if db_handler:
             db_handler.save_market_data(bars.copy(), symbol)
         _cache_data(bars, cache_filepath)

@@ -2,19 +2,25 @@ import asyncio
 import logging
 import os
 import random
-import uuid
 from datetime import datetime, timezone
 
 import numpy as np
 import websockets
 
-from intraday_trader.broker_handler import BrokerAPIHandler
+from intraday_trader.brokers import create_broker
 from intraday_trader.consistency_validator import ConsistencyValidator
 from intraday_trader.exception_handler import (
     ErrorCategory,
     ErrorSeverity,
     ExceptionHandler,
     handle_exceptions,
+)
+from intraday_trader.execution import (
+    OrderPlanOptions,
+    build_order_plan,
+    execute_close_via_order,
+    execute_order_plan,
+    signal_to_target,
 )
 from intraday_trader.live_components import (
     LiveMeanReversionStrategy,
@@ -123,9 +129,9 @@ class EnhancedTradingSystem:
 
         try:
             order_info = await asyncio.to_thread(
-                self.broker_handler.get_order_status, order_id
+                self.broker_handler.get_order, order_id
             )
-            account_info = await asyncio.to_thread(self.broker_handler.get_account_info)
+            account_info = await asyncio.to_thread(self.broker_handler.get_account)
             position_info = await asyncio.to_thread(
                 self.broker_handler.get_position, self.trading_state.symbol
             )
@@ -247,8 +253,8 @@ class EnhancedTradingSystem:
         logger.info("Starting to initialize trading components...")
 
         try:
-            # Initialize ONLY Broker API - no redundant WebSocket handler
-            self.broker_handler = BrokerAPIHandler()
+            # Initialize broker adapter via factory (Phase 1: multi-broker)
+            self.broker_handler = create_broker(self.app_config)
 
             # Initialize trading strategy with correct parameter mapping
             strategy_config = (
@@ -471,7 +477,14 @@ class EnhancedTradingSystem:
 
     @handle_exceptions(ErrorCategory.ORDER_EXECUTION, ErrorSeverity.HIGH)
     def _execute_trade(self, signal: str, current_price: float):
-        # Check if no-fill test mode is enabled
+        """Execute a trading signal through the safe execution pipeline.
+
+        Pipeline: Signal → SignalTarget → OrderPlan → BrokerAdapter.
+
+        This replaces the previous ad-hoc order-param building with a
+        standardised three-stage pipeline that is easier to audit and
+        extend to multi-broker / multi-market scenarios.
+        """
         no_fill_config = self.app_config.get("live_trading", {}).get(
             "no_fill_test_mode", {}
         )
@@ -480,16 +493,18 @@ class EnhancedTradingSystem:
         baseline_cash = self.trading_state.last_known_cash
         baseline_position = self.trading_state.current_position_qty
 
-        # --- Route through QEE execution backend when configured ---
+        # --- Stage 0: QEE backend (existing, unchanged) ---
         if self.qee_backend is not None:
             live_config = self.app_config.get("live_trading", {})
             strategy_name = live_config.get("strategy", "mean_reversion")
             default_qty = live_config.get("default_order_qty", 10)
+            broker_cfg = live_config.get("broker", {})
+            market = broker_cfg.get("market", "US")
 
             result = self.qee_backend.execute_signal(
                 signal,
                 symbol=self.trading_state.symbol,
-                market="US",
+                market=market,
                 order_qty=default_qty,
                 signal_price=current_price,
                 strategy=strategy_name,
@@ -510,128 +525,136 @@ class EnhancedTradingSystem:
                 )
             return
 
-        # Determine strategy name and order quantity from config
+        # --- Stage 1: Signal → SignalTarget ---
         live_trading_config = self.app_config.get("live_trading", {})
+        broker_cfg = live_trading_config.get("broker", {})
+        market = broker_cfg.get("market", "US")
         strategy_name = live_trading_config.get("strategy", "mean_reversion")
         default_qty = live_trading_config.get("default_order_qty", 10)
+
+        target = signal_to_target(
+            signal,
+            symbol=self.trading_state.symbol,
+            market=market,
+            order_qty=default_qty,
+            signal_price=current_price,
+            current_position_qty=self.trading_state.current_position_qty,
+            strategy=strategy_name,
+        )
+
+        if target is None:
+            logger.debug("Signal %s mapped to no target (HOLD).", signal)
+            return
+
+        logger.info(
+            "Signal→Target: %s → %s (weight=%.2f, qty=%d)",
+            signal,
+            target.signal,
+            target.target_weight,
+            target.order_qty,
+        )
+
+        # --- Stage 2: CLOSE signal special handling ---
+        if target.signal == "CLOSE":
+            if is_test_mode:
+                logger.info(
+                    "[NO-FILL-TEST] Skipping CLOSE signal for %s",
+                    target.symbol,
+                )
+                return
+
+            logger.info("Executing CLOSE for %s via pipeline.", target.symbol)
+            try:
+                self.broker_handler.api.close_position(target.symbol)
+                logger.info("CLOSE submitted via broker close_position for %s.", target.symbol)
+            except AttributeError:
+                result = execute_close_via_order(
+                    self.broker_handler,
+                    target.symbol,
+                    self.trading_state.current_position_qty,
+                    current_price,
+                )
+                self._handle_execution_result(result, baseline_cash, baseline_position, current_price, is_test_mode)
+            return
+
+        # --- Stage 3: SignalTarget → OrderPlan ---
         strategy_config = self.app_config.get("strategies", {}).get(strategy_name, {})
         order_settings = strategy_config.get("order_settings", {})
 
-        # --- Determine order parameters based on signal and configuration ---
-        order_params = {
-            "symbol": self.trading_state.symbol,
-            "qty": order_settings.get("default_qty", default_qty),
-            "time_in_force": "day",
-            "client_order_id": f"{'no-fill-test' if is_test_mode else 'live'}_{uuid.uuid4()}",
-        }
+        plan_opts = OrderPlanOptions(
+            lot_size=broker_cfg.get("lot_size", 1),
+            buy_markup_bps=order_settings.get("limit_price_offset_pct", 0.0005) * 10000,
+            sell_discount_bps=order_settings.get("limit_price_offset_pct", 0.0005) * 10000,
+            default_order_type=order_settings.get("entry_order_type", "market"),
+        )
 
-        if self.trading_state.current_position_qty != 0 and signal == "CLOSE":
-            if is_test_mode:
-                logger.info(
-                    f"[NO-FILL-TEST] Skipping CLOSE signal in test mode for {order_params['symbol']}"
-                )
-                return
-            # If it's a CLOSE signal, directly use a market order to close the position
-            logger.info(
-                f"Executing CLOSE signal for {order_params['symbol']} with market order."
-            )
-            self.broker_handler.api.close_position(order_params["symbol"])
+        plan = build_order_plan(
+            target,
+            current_price=current_price,
+            options=plan_opts,
+            is_test_mode=is_test_mode,
+            test_price_offset_pct=no_fill_config.get("price_offset_pct", 0.10),
+        )
+
+        logger.info(
+            "Target→Plan: %s %s %s @ %s (limit=%s, lot=%d)",
+            plan.side,
+            plan.qty,
+            plan.symbol,
+            plan.order_type,
+            plan.limit_price,
+            plan.lot_size,
+        )
+
+        # --- Stage 4: OrderPlan → BrokerAdapter ---
+        result = execute_order_plan(plan, self.broker_handler)
+        self._handle_execution_result(result, baseline_cash, baseline_position, current_price, is_test_mode)
+
+    def _handle_execution_result(self, result, baseline_cash, baseline_position, current_price, is_test_mode):
+        """Post-order tracking: set active order and schedule reconciliation."""
+        order = result.get("order")
+        if order is None:
+            logger.error("Order execution failed: %s", result.get("error"))
             return
 
-        # --- Handle open position signals ---
-        if signal == "BUY":
-            order_params["side"] = "buy"
-            if is_test_mode:
-                order_params["order_type"] = "limit"
-            else:
-                order_params["order_type"] = order_settings.get(
-                    "entry_order_type", "market"
-                )
-        elif signal == "SELL":
-            order_params["side"] = "sell"
-            if is_test_mode:
-                order_params["order_type"] = "limit"
-            else:
-                order_params["order_type"] = order_settings.get(
-                    "entry_order_type", "market"
-                )
-        else:
-            return  # Do not process 'HOLD'
+        order_id = getattr(order, "id", getattr(order, "order_id", None))
+        if not order_id:
+            logger.error("Order placed but no id returned: %s", order)
+            return
 
-        # Calculate limit price based on mode
-        if order_params["order_type"] == "limit":
-            if is_test_mode:
-                # NO-FILL TEST LOGIC: Place orders far from market to ensure they don't fill
-                price_offset = no_fill_config.get("price_offset_pct", 0.10)
-                if order_params["side"] == "buy":
-                    # For buy orders, place limit price 10% below market to ensure no fill
-                    order_params["limit_price"] = round(
-                        current_price * (1 - price_offset), 2
-                    )
-                else:  # sell
-                    # For sell orders, place limit price 10% above market to ensure no fill
-                    order_params["limit_price"] = round(
-                        current_price * (1 + price_offset), 2
-                    )
+        client_order_id = getattr(order, "client_order_id", "")
+        plan = result.get("plan")
 
-                logger.info(
-                    f"[NO-FILL-TEST] Submitting {order_params['side']} limit order for {order_params['qty']} @ {order_params['limit_price']:.2f} with key {order_params['client_order_id']}"
-                )
-                logger.info(
-                    f"[NO-FILL-TEST] Current market price: {current_price:.2f}, Offset: {price_offset * 100:.1f}%"
-                )
-            else:
-                # Normal limit order logic
-                offset = order_settings.get("limit_price_offset_pct", 0.0)
-                if order_params["side"] == "buy":
-                    # When buying, the limit price can be slightly higher than the current price to ensure execution
-                    order_params["limit_price"] = current_price * (1 + offset)
-                else:  # sell
-                    # When selling, the limit price can be slightly lower than the current price
-                    order_params["limit_price"] = current_price * (1 - offset)
-                logger.info(
-                    f"Calculated limit price: {order_params['limit_price']:.2f}"
-                )
-
-        # --- Place order ---
-        order_result = self.broker_handler.place_order(**order_params)
-
-        if order_result and hasattr(order_result, "id"):
-            if is_test_mode:
-                logger.info(
-                    f"[NO-FILL-TEST] Order placed successfully: {order_result.id}"
-                )
-                # Schedule automatic cancellation for test orders
-                test_duration = no_fill_config.get("test_duration_seconds", 60)
-                asyncio.create_task(  # noqa: RUF006 — fire-and-forget, handled by auto-cancel
-                    self._auto_cancel_test_order(order_result.id, test_duration)
-                )
-            else:
-                logger.info(f"Order placed successfully: {order_result.id}")
-
-            self.trading_state.set_active_order(
-                order_result.id, order_result.client_order_id
+        if is_test_mode:
+            logger.info("[NO-FILL-TEST] Order placed: %s", order_id)
+            no_fill_config = self.app_config.get("live_trading", {}).get("no_fill_test_mode", {})
+            test_duration = no_fill_config.get("test_duration_seconds", 60)
+            asyncio.create_task(  # noqa: RUF006 — fire-and-forget, handled by auto-cancel
+                self._auto_cancel_test_order(order_id, test_duration)
             )
-
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(  # noqa: RUF006 — fire-and-forget, handed to event loop
-                    self._post_order_reconciliation(
-                        order_result.id,
-                        baseline_cash=baseline_cash,
-                        baseline_position=baseline_position,
-                        side=order_params.get("side", "buy"),
-                        reference_price=current_price,
-                        is_test_mode=is_test_mode,
-                    )
-                )
-            except RuntimeError:
-                logger.debug(
-                    "Event loop not running; skipping post-order reconciliation task for %s",
-                    order_result.id,
-                )
         else:
-            logger.error(f"Failed to place order with params: {order_params}")
+            logger.info("Order placed: %s", order_id)
+
+        self.trading_state.set_active_order(order_id, client_order_id)
+
+        side = getattr(plan, "side", "buy") if plan else "buy"
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(  # noqa: RUF006 — fire-and-forget, handed to event loop
+                self._post_order_reconciliation(
+                    order_id,
+                    baseline_cash=baseline_cash,
+                    baseline_position=baseline_position,
+                    side=side,
+                    reference_price=current_price,
+                    is_test_mode=is_test_mode,
+                )
+            )
+        except RuntimeError:
+            logger.debug(
+                "Event loop not running; skipping post-order reconciliation for %s",
+                order_id,
+            )
 
     async def start_live_trading(self):
         """Start the live trading system"""
@@ -642,7 +665,7 @@ class EnhancedTradingSystem:
             # Get initial account and position state
             logger.info("Fetching initial account and position state...")
             try:
-                account_info = self.broker_handler.get_account_info()
+                account_info = self.broker_handler.get_account()
                 if account_info:
                     self.trading_state.update_cash_and_value(
                         float(account_info.cash), float(account_info.portfolio_value)
@@ -749,7 +772,7 @@ class EnhancedTradingSystem:
                     )
                     try:
                         # Enhanced reconciliation logging for account info
-                        refreshed_account_info = self.broker_handler.get_account_info()
+                        refreshed_account_info = self.broker_handler.get_account()
                         if refreshed_account_info:
                             if (
                                 self.trading_state.last_known_cash is not None
@@ -813,7 +836,7 @@ class EnhancedTradingSystem:
                             )
 
                             # Get the official state from the REST API
-                            refreshed_order_info = self.broker_handler.get_order_status(
+                            refreshed_order_info = self.broker_handler.get_order(
                                 self.trading_state.active_order_id
                             )
                             rest_status = (
